@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Controller — Reconciliation Agent</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Heroicons / FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .badge-tax { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-under { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-over { background-color: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+    .badge-dup { background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8; }
+    .badge-orphan { background-color: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    .badge-resolved { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Navigation Bar -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+          <i class="fa-solid fa-scale-balanced text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight leading-tight">Finance Controller</h1>
+          <p class="text-xs text-slate-400">CDMS ↔ Razorpay Reconciliation Agent</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-3">
+        <button onclick="seedDemoData()" id="btn-seed" class="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-database text-blue-400"></i> Seed Demo Cycle
+        </button>
+        <button onclick="triggerReconRun()" id="btn-run" class="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-sm flex items-center gap-2 transition">
+          <i class="fa-solid fa-play"></i> Run Reconciliation
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- KPI Summary Row -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
+          <span>Match Rate</span>
+          <i class="fa-solid fa-chart-pie text-blue-500"></i>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpi-match-rate" class="text-2xl font-bold text-slate-900">--%</span>
+          <span id="kpi-cycle-label" class="text-xs text-slate-500 truncate">No run</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden">
+          <div id="kpi-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
+          <span>Total Records</span>
+          <i class="fa-solid fa-file-invoice text-slate-400"></i>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-slate-900" id="kpi-total-records">0</div>
+        <p class="text-xs text-slate-500 mt-1" id="kpi-matched-count">0 matched orders</p>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
+          <span>Open Exceptions</span>
+          <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-amber-600" id="kpi-open-exceptions">0</div>
+        <p class="text-xs text-slate-500 mt-1" id="kpi-resolved-count">0 resolved</p>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
+          <span>Net Discrepancy</span>
+          <i class="fa-solid fa-indian-rupee-sign text-red-500"></i>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-slate-900" id="kpi-net-delta">₹0.00</div>
+        <p class="text-xs text-slate-500 mt-1">Variance requiring action</p>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
+          <span>Cycle History</span>
+          <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+        </div>
+        <div class="mt-2">
+          <select id="cycle-select" onchange="loadSelectedCycle()" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-slate-700 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+            <option value="">Latest Run</option>
+          </select>
+        </div>
+        <span id="kpi-started-at" class="text-[10px] text-slate-400 mt-2 truncate">--</span>
+      </div>
+    </div>
+
+    <!-- Agent Insights Banner -->
+    <div id="insights-container" class="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50 border border-blue-200/80 rounded-xl p-4 shadow-sm hidden">
+      <div class="flex items-start gap-3">
+        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+          <i class="fa-solid fa-brain text-sm"></i>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-blue-900">Agent Cycle Remarks & Observations</h2>
+            <span class="text-[11px] text-blue-600 font-medium bg-blue-100/80 px-2 py-0.5 rounded-full">LLM Pass</span>
+          </div>
+          <ul id="insights-list" class="mt-2 space-y-1 text-xs text-slate-700"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex border-b border-slate-200 space-x-6 text-sm font-medium">
+      <button onclick="switchTab('exceptions')" id="tab-btn-exceptions" class="pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center gap-2">
+        <i class="fa-solid fa-list-check"></i> Discrepancy Exceptions (<span id="tab-count-exceptions">0</span>)
+      </button>
+      <button onclick="switchTab('memory')" id="tab-btn-memory" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2">
+        <i class="fa-solid fa-database"></i> Memory Context Rules
+      </button>
+      <button onclick="switchTab('settlements')" id="tab-btn-settlements" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2">
+        <i class="fa-solid fa-receipt"></i> Webhooks & Settlements
+      </button>
+    </div>
+
+    <!-- TAB 1: Exceptions Table -->
+    <section id="tab-exceptions" class="space-y-4">
+      <!-- Filter Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-lg border border-slate-200">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="filterExceptions('all')" class="filter-btn active px-3 py-1 text-xs rounded-md bg-slate-900 text-white font-medium">All</button>
+          <button onclick="filterExceptions('Tax Mismatch')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Tax Mismatch</button>
+          <button onclick="filterExceptions('Underpayment')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Underpayment</button>
+          <button onclick="filterExceptions('Overpayment')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Overpayment</button>
+          <button onclick="filterExceptions('Duplicate Credit Note')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Duplicate CN</button>
+          <button onclick="filterExceptions('Orphan')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Orphan Payment</button>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <label class="text-slate-500">Show:</label>
+          <select id="filter-resolved" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none text-slate-700">
+            <option value="all">All Items</option>
+            <option value="open" selected>Open Only</option>
+            <option value="resolved">Resolved Only</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Exception Table Container -->
+      <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
+              <tr>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Error Type</th>
+                <th class="py-3 px-4">Invoice / Pay ID</th>
+                <th class="py-3 px-4">Customer Name</th>
+                <th class="py-3 px-4 text-right">Delta (₹)</th>
+                <th class="py-3 px-4">Agent Remark & Contextual Root Cause</th>
+                <th class="py-3 px-4 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="exceptions-tbody" class="divide-y divide-slate-200">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-slate-400">Loading exceptions...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: Memory Context -->
+    <section id="tab-memory" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add Context Form -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-plus-circle text-blue-600"></i> Add Memory Context
+          </h3>
+          <p class="text-xs text-slate-500">Provide tax rate changes, policy updates, discount authorizations, or active dispute notes that inform the LLM remark pass.</p>
+
+          <form id="form-add-context" onsubmit="submitMemoryContext(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Context Type</label>
+              <select id="ctx-type" required class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 outline-none">
+                <option value="Tax Rate Change">Tax Rate Change</option>
+                <option value="Policy Change">Policy Change</option>
+                <option value="Discount Scheme">Discount Scheme</option>
+                <option value="Disputed Transaction">Disputed Transaction</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Description / Context Details</label>
+              <textarea id="ctx-desc" required rows="3" placeholder="e.g. GST on Category B changed from 12% to 18% effective Aug 15..." class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Effective Date (optional)</label>
+              <input type="date" id="ctx-date" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 outline-none">
+            </div>
+            <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg transition shadow-sm">
+              Save Context Rule
+            </button>
+          </form>
+        </div>
+
+        <!-- Active Contexts List -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-layer-group text-indigo-600"></i> Active Memory Contexts
+            </h3>
+            <span class="text-xs text-slate-400" id="memory-context-count">0 rules active</span>
+          </div>
+
+          <div id="memory-context-list" class="space-y-3 max-h-[500px] overflow-y-auto">
+            <p class="text-xs text-slate-400">Loading memory context...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: Settlements & Webhook Stream -->
+    <section id="tab-settlements" class="hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Raw Webhooks -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-code text-slate-600"></i> Raw Razorpay Events (Idempotency Stream)
+          </h3>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 font-medium">
+                <tr>
+                  <th class="p-2">Event ID</th>
+                  <th class="p-2">Type</th>
+                  <th class="p-2">Received At</th>
+                  <th class="p-2">Processed</th>
+                </tr>
+              </thead>
+              <tbody id="raw-events-tbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Settlements Normalized -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-money-bill-transfer text-green-600"></i> Normalized Settlements
+          </h3>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 font-medium">
+                <tr>
+                  <th class="p-2">Payment ID</th>
+                  <th class="p-2">Invoice Tag</th>
+                  <th class="p-2 text-right">Amount (₹)</th>
+                  <th class="p-2">UTR</th>
+                  <th class="p-2">Settled At</th>
+                </tr>
+              </thead>
+              <tbody id="settlements-tbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Resolution Modal -->
+  <div id="resolve-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-900">Resolve Exception</h3>
+        <button onclick="closeResolveModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="text-xs text-slate-600 space-y-1">
+        <p><strong>Invoice:</strong> <span id="modal-invoice-no">--</span></p>
+        <p><strong>Discrepancy Delta:</strong> <span id="modal-delta" class="font-bold">--</span></p>
+        <p><strong>Error Type:</strong> <span id="modal-error-type">--</span></p>
+      </div>
+      <form onsubmit="submitResolve(event)" class="space-y-3">
+        <input type="hidden" id="modal-exception-id">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Resolution Note / Audit Trail</label>
+          <textarea id="modal-note" required rows="3" placeholder="e.g. Verified customer paid balance via NEFT / Duplicate CN reversed in CDMS" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeResolveModal()" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-500 rounded-lg shadow-sm">Mark Resolved</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast" class="fixed bottom-4 right-4 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 transform translate-y-20 opacity-0 transition duration-300 z-50">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-green-400"></i>
+    <span id="toast-msg">Action completed</span>
+  </div>
+
+  <!-- Dashboard Client Logic -->
+  <script>
+    let allExceptions = [];
+    let currentFilterType = 'all';
+    let currentRunId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadRuns();
+      loadMemoryContext();
+      loadSettlementsAndEvents();
+    });
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+      toastMsg.innerText = msg;
+      toastIcon.className = isError ? 'fa-solid fa-circle-exclamation text-red-400' : 'fa-solid fa-circle-check text-green-400';
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    async function loadRuns() {
+      try {
+        const res = await fetch('/api/runs');
+        const runs = await res.json();
+        const select = document.getElementById('cycle-select');
+        select.innerHTML = '<option value="">Latest Run</option>';
+        runs.forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r.id;
+          opt.innerText = `${r.cycle_label} (${r.match_rate || 0}%)`;
+          select.appendChild(opt);
+        });
+
+        if (runs.length > 0) {
+          loadCycleDetails(runs[0].id);
+        } else {
+          renderEmptyState();
+        }
+      } catch (err) {
+        console.error("Failed to load runs:", err);
+      }
+    }
+
+    async function loadCycleDetails(runId) {
+      currentRunId = runId;
+      try {
+        const res = await fetch(`/api/runs/${runId}`);
+        const data = await res.json();
+        const run = data.run;
+        allExceptions = data.exceptions || [];
+
+        // Update KPIs
+        document.getElementById('kpi-match-rate').innerText = `${run.match_rate || 0}%`;
+        document.getElementById('kpi-cycle-label').innerText = run.cycle_label;
+        document.getElementById('kpi-progress-bar').style.width = `${run.match_rate || 0}%`;
+        document.getElementById('kpi-total-records').innerText = run.total_records || 0;
+        document.getElementById('kpi-matched-count').innerText = `${run.matched_count || 0} matched orders`;
+        
+        const openCount = allExceptions.filter(e => !e.resolved).length;
+        const resolvedCount = allExceptions.filter(e => e.resolved).length;
+        document.getElementById('kpi-open-exceptions').innerText = openCount;
+        document.getElementById('kpi-resolved-count').innerText = `${resolvedCount} resolved`;
+
+        const netDelta = allExceptions.reduce((sum, e) => sum + (e.delta || 0), 0);
+        document.getElementById('kpi-net-delta').innerText = `₹${Math.abs(netDelta).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+        document.getElementById('kpi-started-at').innerText = `Run: ${new Date(run.started_at).toLocaleString()}`;
+        document.getElementById('tab-count-exceptions').innerText = allExceptions.length;
+
+        // Render Insights
+        const insightsContainer = document.getElementById('insights-container');
+        const insightsList = document.getElementById('insights-list');
+        if (data.insights && data.insights.length > 0) {
+          insightsList.innerHTML = data.insights.map(i => `
+            <li class="flex items-center gap-2">
+              <i class="fa-solid fa-chevron-right text-[10px] text-blue-500"></i>
+              <span>${i.insight}</span>
+            </li>
+          `).join('');
+          insightsContainer.classList.remove('hidden');
+        } else {
+          insightsContainer.classList.add('hidden');
+        }
+
+        applyFilters();
+      } catch (err) {
+        console.error("Failed to load cycle details:", err);
+      }
+    }
+
+    function loadSelectedCycle() {
+      const select = document.getElementById('cycle-select');
+      if (select.value) {
+        loadCycleDetails(select.value);
+      } else {
+        loadRuns();
+      }
+    }
+
+    function filterExceptions(type) {
+      currentFilterType = type;
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('bg-slate-900', 'text-white');
+        b.classList.add('bg-slate-100', 'text-slate-700');
+      });
+      event.target.classList.remove('bg-slate-100', 'text-slate-700');
+      event.target.classList.add('bg-slate-900', 'text-white');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const resolvedFilter = document.getElementById('filter-resolved').value;
+      let filtered = allExceptions;
+
+      if (currentFilterType !== 'all') {
+        filtered = filtered.filter(e => e.error_type.toLowerCase().includes(currentFilterType.toLowerCase()));
+      }
+
+      if (resolvedFilter === 'open') {
+        filtered = filtered.filter(e => !e.resolved);
+      } else if (resolvedFilter === 'resolved') {
+        filtered = filtered.filter(e => e.resolved);
+      }
+
+      renderExceptionsTable(filtered);
+    }
+
+    function getBadgeClass(type) {
+      if (type.includes('Tax')) return 'badge-tax';
+      if (type.includes('Underpayment')) return 'badge-under';
+      if (type.includes('Overpayment')) return 'badge-over';
+      if (type.includes('Duplicate')) return 'badge-dup';
+      if (type.includes('Orphan')) return 'badge-orphan';
+      return 'bg-slate-100 text-slate-700';
+    }
+
+    function renderExceptionsTable(items) {
+      const tbody = document.getElementById('exceptions-tbody');
+      if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">No matching exceptions found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => {
+        const badgeClass = getBadgeClass(item.error_type);
+        const statusBadge = item.resolved
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold badge-resolved"><i class="fa-solid fa-check"></i> Resolved</span>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">Open</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50/75 transition">
+            <td class="py-3 px-4">${statusBadge}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 rounded text-[11px] font-medium ${badgeClass}">
+                ${item.error_type}
+              </span>
+            </td>
+            <td class="py-3 px-4 font-mono font-medium text-slate-900">${item.invoice_no || '<em>None</em>'}</td>
+            <td class="py-3 px-4 text-slate-700">${item.customer_name || 'N/A'}</td>
+            <td class="py-3 px-4 text-right font-mono font-bold ${item.delta > 0 ? 'text-red-600' : 'text-blue-600'}">
+              ₹${item.delta ? item.delta.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '0.00'}
+            </td>
+            <td class="py-3 px-4 text-slate-600 text-[11px] max-w-md">
+              <p>${item.remark || '<em>No remark generated</em>'}</p>
+              ${item.resolved_note ? `<p class="mt-1 text-[10px] text-green-700 bg-green-50 p-1 rounded border border-green-200"><strong>Resolution Note:</strong> ${item.resolved_note}</p>` : ''}
+            </td>
+            <td class="py-3 px-4 text-center">
+              ${!item.resolved ? `
+                <button onclick="openResolveModal(${item.id}, '${item.invoice_no || ''}', ${item.delta}, '${item.error_type}')" class="px-2.5 py-1 text-[11px] font-medium text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 rounded transition">
+                  Resolve
+                </button>
+              ` : `
+                <span class="text-slate-400 text-xs"><i class="fa-solid fa-lock"></i></span>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderEmptyState() {
+      document.getElementById('exceptions-tbody').innerHTML = `
+        <tr>
+          <td colspan="7" class="py-12 text-center text-slate-400">
+            <i class="fa-solid fa-inbox text-3xl mb-2"></i>
+            <p>No reconciliation runs found.</p>
+            <p class="text-xs text-slate-500 mt-1">Click "Seed Demo Cycle" then "Run Reconciliation" to test the pipeline.</p>
+          </td>
+        </tr>
+      `;
+    }
+
+    async function triggerReconRun() {
+      const btn = document.getElementById('btn-run');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running...';
+      try {
+        const res = await fetch('/internal/run-reconciliation', { method: 'POST' });
+        const data = await res.json();
+        showToast('Reconciliation run completed successfully!');
+        loadRuns();
+      } catch (err) {
+        showToast('Failed to execute reconciliation run', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Reconciliation';
+      }
+    }
+
+    async function seedDemoData() {
+      const btn = document.getElementById('btn-seed');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
+      try {
+        const res = await fetch('/api/seed-demo-data', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || 'Demo data seeded!');
+        loadMemoryContext();
+        loadSettlementsAndEvents();
+        // Auto trigger reconciliation for convenience
+        triggerReconRun();
+      } catch (err) {
+        showToast('Failed to seed demo data', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-database text-blue-400"></i> Seed Demo Cycle';
+      }
+    }
+
+    function openResolveModal(id, invoiceNo, delta, errorType) {
+      document.getElementById('modal-exception-id').value = id;
+      document.getElementById('modal-invoice-no').innerText = invoiceNo || 'Orphan Payment';
+      document.getElementById('modal-delta').innerText = `₹${delta.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+      document.getElementById('modal-error-type').innerText = errorType;
+      document.getElementById('modal-note').value = '';
+      document.getElementById('resolve-modal').classList.remove('hidden');
+    }
+
+    function closeResolveModal() {
+      document.getElementById('resolve-modal').classList.add('hidden');
+    }
+
+    async function submitResolve(e) {
+      e.preventDefault();
+      const id = document.getElementById('modal-exception-id').value;
+      const note = document.getElementById('modal-note').value;
+      try {
+        const res = await fetch(`/api/exceptions/${id}/resolve`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resolved: true, resolved_note: note })
+        });
+        if (res.ok) {
+          showToast('Exception resolved successfully');
+          closeResolveModal();
+          if (currentRunId) loadCycleDetails(currentRunId);
+        } else {
+          showToast('Failed to resolve exception', true);
+        }
+      } catch (err) {
+        showToast('Error communicating with server', true);
+      }
+    }
+
+    async function loadMemoryContext() {
+      try {
+        const res = await fetch('/api/memory-context');
+        const contexts = await res.json();
+        document.getElementById('memory-context-count').innerText = `${contexts.length} rules active`;
+        const list = document.getElementById('memory-context-list');
+        if (contexts.length === 0) {
+          list.innerHTML = `<p class="text-xs text-slate-400">No memory context items defined yet.</p>`;
+          return;
+        }
+        list.innerHTML = contexts.map(c => `
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800 rounded">
+                  ${c.context_type}
+                </span>
+                ${c.effective_date ? `<span class="text-[10px] text-slate-400">Effective: ${c.effective_date}</span>` : ''}
+              </div>
+              <p class="text-xs text-slate-700 mt-1.5">${c.description}</p>
+            </div>
+            <button onclick="deleteContext(${c.id})" class="text-slate-400 hover:text-red-600 text-xs ml-3">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error("Failed to load memory context:", err);
+      }
+    }
+
+    async function submitMemoryContext(e) {
+      e.preventDefault();
+      const type = document.getElementById('ctx-type').value;
+      const desc = document.getElementById('ctx-desc').value;
+      const date = document.getElementById('ctx-date').value || null;
+
+      try {
+        const res = await fetch('/api/memory-context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ context_type: type, description: desc, effective_date: date })
+        });
+        if (res.ok) {
+          showToast('Memory context added successfully');
+          document.getElementById('form-add-context').reset();
+          loadMemoryContext();
+        }
+      } catch (err) {
+        showToast('Failed to add memory context', true);
+      }
+    }
+
+    async function deleteContext(id) {
+      if (!confirm('Are you sure you want to delete this memory context rule?')) return;
+      try {
+        const res = await fetch(`/api/memory-context/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Memory context deleted');
+          loadMemoryContext();
+        }
+      } catch (err) {
+        showToast('Failed to delete memory context', true);
+      }
+    }
+
+    async function loadSettlementsAndEvents() {
+      try {
+        const [evRes, stlRes] = await Promise.all([
+          fetch('/api/events/raw'),
+          fetch('/api/settlements')
+        ]);
+        const events = await evRes.json();
+        const settlements = await stlRes.json();
+
+        // Raw Events
+        document.getElementById('raw-events-tbody').innerHTML = events.map(e => `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2 font-mono">${e.event_id}</td>
+            <td class="p-2">${e.event_type}</td>
+            <td class="p-2 text-slate-500">${new Date(e.received_at).toLocaleTimeString()}</td>
+            <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${e.processed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${e.processed ? 'Yes' : 'No'}</span></td>
+          </tr>
+        `).join('');
+
+        // Settlements
+        document.getElementById('settlements-tbody').innerHTML = settlements.map(s => `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2 font-mono font-medium">${s.payment_id}</td>
+            <td class="p-2 font-mono">${s.invoice_no || '<span class="text-amber-600 italic">None</span>'}</td>
+            <td class="p-2 text-right font-mono font-bold">₹${parseFloat(s.amount).toFixed(2)}</td>
+            <td class="p-2 font-mono text-slate-500">${s.utr || 'N/A'}</td>
+            <td class="p-2 text-slate-500">${new Date(s.settled_at).toLocaleDateString()}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error("Failed to load settlements/events:", err);
+      }
+    }
+
+    function switchTab(tab) {
+      ['exceptions', 'memory', 'settlements'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-btn-${t}`);
+        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-slate-500');
+      });
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-btn-${tab}`);
+      activeBtn.classList.remove('border-transparent', 'text-slate-500');
+      activeBtn.classList.add('border-blue-600', 'text-blue-600');
+    }
+  </script>
+</body>
+</html>
