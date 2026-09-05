@@ -1,4 +1,4 @@
-# Finance Controller — Reconciliation Agent
+# Finance Agent (Controller — Reconciliation - Auditor)
 ### Automated CDMS ↔ Razorpay Reconciliation Engine & Review Surface (Spec v1)
 
 A single-service, high-reliability reconciliation agent designed for weekly finance reconciliation cycles (50–200+ records) between CDMS invoices/credit notes and Razorpay payments/settlements.
