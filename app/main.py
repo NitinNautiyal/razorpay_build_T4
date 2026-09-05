@@ -12,6 +12,7 @@ from app.routes.reconciliation import router as recon_router
 from app.routes.exceptions import router as exceptions_router
 from app.routes.memory import router as memory_router
 from app.routes.cdms import router as cdms_router
+from app.routes.audit import router as audit_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,7 +23,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Finance Controller — Reconciliation Agent",
     description="Automated CDMS ↔ Razorpay Reconciliation Engine and Review Dashboard",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -36,6 +37,7 @@ app.include_router(recon_router)
 app.include_router(exceptions_router)
 app.include_router(memory_router)
 app.include_router(cdms_router)
+app.include_router(audit_router)
 
 @app.get("/", response_class=HTMLResponse)
 def get_dashboard(request: Request):

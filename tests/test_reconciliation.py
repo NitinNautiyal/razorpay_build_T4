@@ -96,3 +96,15 @@ def test_orphan_settlement_detection():
     assert exceptions[0]["error_type"] == "Unmatched Settlement / Orphan Payment"
     assert exceptions[0]["delta"] == -3500.00
     assert "pay_orphan_test" in exceptions[0]["remark"] or "Orphan" in exceptions[0]["remark"]
+
+def test_disputed_invoice_classification():
+    """Invoice matching active dispute in memory_context is classified as Disputed Invoice (PRD §7.5)."""
+    add_memory_context("Disputed Transaction", "INV-DISP-001 under dispute regarding damaged transit carton #4491.")
+    seed_order("INV-DISP-001", total_amount=3540.00, tax_rate=0.18)
+    handle_razorpay_webhook(fake_payment_captured_event("INV-DISP-001", 3000.00))
+
+    run_id = run_reconciliation()
+    exceptions = get_exceptions(run_id)
+    assert len(exceptions) == 1
+    assert exceptions[0]["error_type"] == "Disputed Invoice"
+    assert "dispute" in exceptions[0]["remark"].lower()

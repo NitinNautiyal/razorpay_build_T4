@@ -1,0 +1,13 @@
+payment_id,utr,invoice_no,amount,method,customer_name,reconciliation_scenario
+pay_under_01,UTRAPOLLO5605,INV-2026-ERR-UNDER,5605.00,netbanking,Apollo Pharmacy,Underpayment (5% Prompt Discount ₹295 short)
+pay_over_01,UTRFORTIS5000,INV-2026-ERR-OVER,5000.00,netbanking,Fortis Healthcare Ltd,Overpayment (₹280 excess settlement)
+pay_tax_01,UTRCAREMAX11200,INV-2026-ERR-TAX,11800.00,netbanking,CareMax Healthcare,Tax Mismatch (12% vs 18% GST master table discrepancy)
+pay_dupcn_01,UTRZENITH1860,INV-2026-ERR-DUPCN,1860.00,netbanking,Zenith Pharma,Duplicate Credit Note (Customer paid net of 1 CN; ERP has twin CNs)
+pay_disp_01,UTRHEALTH3000,INV-2026-DEMO-DISPUTE,3000.00,netbanking,HealthCart Logistics,Disputed Transaction (Transit damage dispute withholding ₹540)
+pay_bulk_rel_5900,UTRREL5900,"INV-2026-BULK-001, INV-2026-BULK-002",5900.00,netbanking,Reliance Retail Group,Bulk Payment Allocation (Many-to-One: ₹2360 + ₹3540)
+pay_inst_part_1,UTRTATA2500,INV-2026-INST-001,2500.00,netbanking,Tata 1mg Health,Installment Allocation Part 1 (One-to-Many)
+pay_inst_part_2,UTRTATA2220,INV-2026-INST-001,2220.00,netbanking,Tata 1mg Health,Installment Allocation Part 2 (Total = ₹4720)
+pay_cn_match_01,UTRMEDPLUS1000,INV-2026-MATCH-CN,1000.00,netbanking,MedPlus Distributors,Clean Match with Credit Note (₹1180 - ₹180 CN = ₹1000)
+pay_match_01,UTRMETRO1180,INV-2026-MATCH-001,1180.00,netbanking,Metro Retailer 1,Clean 1:1 Match (₹1180 = ₹1180)
+pay_orphan_suspense_01,HDFC99881122,,4500.00,netbanking,Unmatched Cash Receipt,Orphan Payment (No invoice tag; direct remittance)
+pay_unalloc_bulk_q3,KKBK776655,bulk_advance_q3,18500.00,netbanking,Bulk Remittance Cust,Unallocated Bulk Payment (₹18500 lump sum advance)

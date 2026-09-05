@@ -91,7 +91,7 @@ class Database:
         return query, params
 
     def init_db(self, schema_file: Optional[str] = None):
-        """Initializes database tables and indexes."""
+        """Initializes database tables and indexes, and runs migrations for new columns."""
         if schema_file is None:
             schema_file = os.path.join(os.path.dirname(__file__), "schema.sql")
         
@@ -101,13 +101,72 @@ class Database:
         with self.connect() as conn:
             cursor = conn.cursor()
             if self.is_sqlite:
+                # First run migrations if tables already exist
+                self._run_sqlite_migrations(conn)
                 cursor.executescript(schema_sql)
             else:
                 cursor.execute(schema_sql)
 
+    def _run_sqlite_migrations(self, conn: sqlite3.Connection):
+        """Ensures newly added columns exist in existing SQLite tables."""
+        migrations = [
+            ("reconciliation_runs", "status", "TEXT DEFAULT 'complete'"),
+            ("reconciliation_runs", "lock_acquired", "BOOLEAN DEFAULT 0"),
+            ("reconciliation_runs", "queued_reason", "TEXT"),
+            ("reconciliation_runs", "error_message", "TEXT"),
+            ("orders", "version", "INTEGER DEFAULT 1"),
+            ("orders", "superseded_by", "TEXT"),
+            ("credit_notes", "version", "INTEGER DEFAULT 1"),
+            ("credit_notes", "superseded_by", "TEXT"),
+            ("exceptions", "status", "TEXT DEFAULT 'open'"),
+            ("exceptions", "escalated_at", "TIMESTAMP"),
+            ("exceptions", "resolved_at", "TIMESTAMP"),
+            ("exceptions", "resolved_by", "TEXT"),
+            ("exceptions", "plausible_causes", "TEXT"),
+            ("exceptions", "pattern_key", "TEXT"),
+            ("memory_context", "role", "TEXT DEFAULT 'admin'"),
+            ("memory_insights", "pattern_key", "TEXT"),
+            ("memory_insights", "frequency", "INTEGER DEFAULT 1"),
+            ("memory_insights", "severity", "TEXT DEFAULT 'Medium'"),
+            ("memory_insights", "actionable_fix", "TEXT"),
+        ]
+        cursor = conn.cursor()
+        for table, col, col_def in migrations:
+            try:
+                cursor.execute(f"PRAGMA table_info({table})")
+                rows = cursor.fetchall()
+                if rows:
+                    cols = [row["name"] if isinstance(row, dict) else row[1] for row in rows]
+                    if col not in cols:
+                        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+            except Exception:
+                pass
+                pass
+
+    def log_audit(
+        self,
+        actor: str,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        before_state: Optional[Any] = None,
+        after_state: Optional[Any] = None
+    ) -> int:
+        """Appends an immutable audit log entry."""
+        import json
+        b_str = json.dumps(before_state, default=str) if before_state is not None else None
+        a_str = json.dumps(after_state, default=str) if after_state is not None else None
+        return self.execute(
+            """INSERT INTO audit_log (actor, action, entity_type, entity_id, before_state, after_state)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (actor, action, entity_type, str(entity_id), b_str, a_str)
+        )
+
     def clear_tables(self):
         """Clears all tables in foreign key dependency order."""
         tables = [
+            "audit_log",
+            "settlement_allocations",
             "exceptions",
             "memory_insights",
             "memory_context",
@@ -120,7 +179,10 @@ class Database:
         with self.connect() as conn:
             cursor = conn.cursor()
             for t in tables:
-                cursor.execute(f"DELETE FROM {t}")
+                try:
+                    cursor.execute(f"DELETE FROM {t}")
+                except Exception:
+                    pass
 
 # Global DB instance
 db = Database()

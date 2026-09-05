@@ -79,3 +79,33 @@ async def test_memory_context_crud():
         # Delete memory context
         res_del = await ac.delete(f"/api/memory-context/{ctx_id}")
         assert res_del.status_code == 200
+
+@pytest.mark.asyncio
+async def test_patterns_and_learning_api():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await ac.post("/api/seed-demo-data")
+        await ac.post("/internal/run-reconciliation")
+
+        res_pat = await ac.get("/api/patterns")
+        assert res_pat.status_code == 200
+        data = res_pat.json()
+        assert data["status"] == "success"
+        assert len(data["patterns"]) >= 1
+        assert len(data["learning_curve"]) >= 1
+        assert data["metrics"]["learning_confidence"] > 90
+
+@pytest.mark.asyncio
+async def test_export_and_config_api():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await ac.post("/api/seed-demo-data")
+        await ac.post("/internal/run-reconciliation")
+
+        res_exp = await ac.get("/api/export/discrepancies")
+        assert res_exp.status_code == 200
+        assert "text/csv" in res_exp.headers.get("content-type", "")
+        assert "Invoice" in res_exp.text
+
+        res_cfg = await ac.get("/api/config")
+        assert res_cfg.status_code == 200
+        assert res_cfg.json()["tolerance"] == 0.09
+        assert res_cfg.json()["standard_tax_rate"] == 0.18

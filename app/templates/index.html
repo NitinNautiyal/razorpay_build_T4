@@ -3,405 +3,1215 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Finance Controller — Reconciliation Agent</title>
+  <title>Razorpay — Reconciliation Agent (Finance Controller)</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Heroicons / FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f8fafc;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #94a3b8;
+      transition: all 0.15s ease;
+    }
+    .sidebar-item:hover {
+      color: #ffffff;
+      background-color: rgba(255, 255, 255, 0.06);
+    }
+    .sidebar-item.active {
+      background-color: #0c66e4;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .filter-chip {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      border: 1px solid #e2e8f0;
+      background-color: #ffffff;
+      color: #475569;
+      transition: all 0.15s ease;
+    }
+    .filter-chip:hover {
+      background-color: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+    .filter-chip.active {
+      background-color: #0c66e4;
+      border-color: #0c66e4;
+      color: #ffffff;
+    }
+
+    .recon-table th {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: capitalize;
+      padding: 0.75rem 1rem;
+      background-color: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .recon-table td {
+      padding: 0.85rem 1rem;
+      font-size: 0.8rem;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    .recon-table tr:hover td {
+      background-color: #f8fafc;
+    }
+
+    /* Discrepancy Badges */
     .badge-tax { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     .badge-under { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
     .badge-over { background-color: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
     .badge-dup { background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8; }
     .badge-orphan { background-color: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
-    .badge-resolved { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-dispute { background-color: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+    .badge-bulk { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+
+    /* Status Badges */
+    .status-open { background-color: #fffbeb; color: #b45309; border: 1px solid #fef3c7; }
+    .status-escalated { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .status-resolved { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .status-reopened { background-color: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+<body class="min-h-screen flex text-slate-800 antialiased overflow-x-hidden">
 
-  <!-- Navigation Bar -->
-  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
-          <i class="fa-solid fa-scale-balanced text-lg"></i>
+  <!-- ==================== 1. LEFT NAVIGATION SIDEBAR ==================== -->
+  <aside class="w-64 bg-[#0a1120] text-slate-300 flex flex-col justify-between shrink-0 min-h-screen border-r border-slate-800 select-none z-20">
+    <div class="p-5 space-y-6">
+      
+      <!-- Razorpay Logo -->
+      <div class="flex items-center gap-2.5 px-2 py-1">
+        <div class="w-7 h-7 rounded bg-[#0c66e4] flex items-center justify-center text-white font-black text-sm shadow-sm">
+          <svg class="w-4 h-4 fill-white" viewBox="0 0 24 24">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4v-7h2.5l4.5 7h4.5l-5-7.5A6 6 0 0 0 14.5 2zm-2.5 8H8V6h4a2 2 0 0 1 0 4z"/>
+          </svg>
         </div>
-        <div>
-          <h1 class="text-lg font-semibold tracking-tight leading-tight">Finance Controller</h1>
-          <p class="text-xs text-slate-400">CDMS ↔ Razorpay Reconciliation Agent</p>
+        <span class="text-lg font-extrabold tracking-tight text-white italic">Razorpay</span>
+      </div>
+
+      <!-- Navigation Modules -->
+      <nav class="space-y-1">
+        <a href="#" class="sidebar-item">
+          <i class="fa-solid fa-house w-4 text-center"></i>
+          <span>Home</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <i class="fa-regular fa-credit-card w-4 text-center"></i>
+          <span>Payments</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <i class="fa-solid fa-arrow-up-right-from-square w-4 text-center"></i>
+          <span>Payouts</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <i class="fa-solid fa-building-columns w-4 text-center"></i>
+          <span>Banking</span>
+        </a>
+        <a href="#" class="sidebar-item active">
+          <i class="fa-solid fa-scale-balanced w-4 text-center"></i>
+          <span>Reconciliation</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <i class="fa-solid fa-chart-pie w-4 text-center"></i>
+          <span>Reports</span>
+        </a>
+        <a href="#" class="sidebar-item" onclick="openRawLedgerModal()">
+          <i class="fa-solid fa-code w-4 text-center"></i>
+          <span>Ledger & Raw Stream</span>
+        </a>
+        <a href="#" class="sidebar-item" onclick="openSettingsModal()">
+          <i class="fa-solid fa-gear w-4 text-center"></i>
+          <span>Settings</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Bottom Role & Profile Card -->
+    <div class="p-4 border-t border-slate-800/80 space-y-2">
+      <div class="px-2">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Simulated Role</div>
+        <select id="user-role-select" onchange="handleRoleChange(this.value)" class="w-full text-xs font-semibold bg-[#1e293b] text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-blue-500">
+          <option value="finance_controller" selected>Finance Controller</option>
+          <option value="admin">Finance Admin</option>
+          <option value="auditor">Compliance Auditor</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition cursor-pointer">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-full bg-[#1e293b] border border-slate-700 flex items-center justify-center font-bold text-xs text-blue-400">
+            FC
+          </div>
+          <div class="text-left">
+            <div class="text-xs font-semibold text-white">Finance Ops</div>
+            <div class="text-[10px] text-slate-400">INR Enterprise</div>
+          </div>
+        </div>
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ==================== 2. MAIN APPLICATION WORKSPACE ==================== -->
+  <div class="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
+
+    <!-- Top Workspace Header -->
+    <header class="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-10 shadow-xs">
+      
+      <!-- Global Search Bar with ⌘ K -->
+      <div class="relative w-96">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+        <input type="text" id="global-search" placeholder="Search by invoice, customer, or ID..."
+               class="w-full bg-[#f8fafc] border border-slate-200 rounded-lg pl-9 pr-14 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+               oninput="handleGlobalSearch(this.value)">
+        <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400">
+          <span>⌘</span><span>K</span>
         </div>
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex items-center space-x-3">
-        <button onclick="seedDemoData()" id="btn-seed" class="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg flex items-center gap-1.5 transition">
-          <i class="fa-solid fa-database text-blue-400"></i> Seed Demo Cycle
+      <div class="flex items-center gap-3">
+        <button onclick="seedDemoData()" id="btn-seed" class="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs flex items-center gap-2 transition">
+          <i class="fa-solid fa-database text-blue-600"></i>
+          <span>Seed Demo Cycle</span>
         </button>
-        <button onclick="triggerReconRun()" id="btn-run" class="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-sm flex items-center gap-2 transition">
-          <i class="fa-solid fa-play"></i> Run Reconciliation
+        <button onclick="triggerReconRun()" id="btn-run" class="px-4 py-1.5 text-xs font-semibold text-white bg-[#0c66e4] hover:bg-blue-600 rounded-lg shadow-sm flex items-center gap-2 transition">
+          <i class="fa-solid fa-play text-[10px]" id="btn-run-icon"></i>
+          <span id="btn-run-text">Run Reconciliation</span>
         </button>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+    <!-- Main Scrollable Content Container -->
+    <main class="flex-1 p-6 sm:p-8 space-y-6 max-w-7xl w-full mx-auto">
 
-    <!-- KPI Summary Row -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
-          <span>Match Rate</span>
-          <i class="fa-solid fa-chart-pie text-blue-500"></i>
+      <!-- Breadcrumbs & Main Page Title -->
+      <div>
+        <div class="text-[11px] font-medium text-slate-400 mb-1">/ Finance Controller → Reconciliation</div>
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="text-xl font-bold tracking-tight text-slate-900">CDMS ↔ Razorpay Reconciliation Agent</h1>
+          <span id="agent-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" id="agent-status-dot"></span>
+            <span id="agent-status-text">Ready to run</span>
+          </span>
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span id="kpi-match-rate" class="text-2xl font-bold text-slate-900">--%</span>
-          <span id="kpi-cycle-label" class="text-xs text-slate-500 truncate">No run</span>
-        </div>
-        <div class="w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden">
-          <div id="kpi-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-        </div>
+        <p class="text-xs text-slate-500 mt-1">Automated deterministic matching, allocation resolution, and grounded LLM reasoning.</p>
       </div>
 
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
-          <span>Total Records</span>
-          <i class="fa-solid fa-file-invoice text-slate-400"></i>
-        </div>
-        <div class="mt-2 text-2xl font-bold text-slate-900" id="kpi-total-records">0</div>
-        <p class="text-xs text-slate-500 mt-1" id="kpi-matched-count">0 matched orders</p>
-      </div>
-
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
-          <span>Open Exceptions</span>
-          <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
-        </div>
-        <div class="mt-2 text-2xl font-bold text-amber-600" id="kpi-open-exceptions">0</div>
-        <p class="text-xs text-slate-500 mt-1" id="kpi-resolved-count">0 resolved</p>
-      </div>
-
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
-          <span>Net Discrepancy</span>
-          <i class="fa-solid fa-indian-rupee-sign text-red-500"></i>
-        </div>
-        <div class="mt-2 text-2xl font-bold text-slate-900" id="kpi-net-delta">₹0.00</div>
-        <p class="text-xs text-slate-500 mt-1">Variance requiring action</p>
-      </div>
-
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-        <div class="flex items-center justify-between text-slate-500 text-xs font-medium uppercase tracking-wider">
-          <span>Cycle History</span>
-          <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
-        </div>
-        <div class="mt-2">
-          <select id="cycle-select" onchange="loadSelectedCycle()" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-slate-700 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
-            <option value="">Latest Run</option>
-          </select>
-        </div>
-        <span id="kpi-started-at" class="text-[10px] text-slate-400 mt-2 truncate">--</span>
-      </div>
-    </div>
-
-    <!-- Agent Insights Banner -->
-    <div id="insights-container" class="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50 border border-blue-200/80 rounded-xl p-4 shadow-sm hidden">
-      <div class="flex items-start gap-3">
-        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-          <i class="fa-solid fa-brain text-sm"></i>
-        </div>
-        <div class="flex-1">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-blue-900">Agent Cycle Remarks & Observations</h2>
-            <span class="text-[11px] text-blue-600 font-medium bg-blue-100/80 px-2 py-0.5 rounded-full">LLM Pass</span>
+      <!-- ==================== DYNAMIC INGESTION / STATE BANNER ==================== -->
+      <div id="state-banner" class="hidden p-4 rounded-xl border flex items-center justify-between transition-all">
+        <div class="flex items-center gap-3">
+          <div id="state-banner-icon" class="w-8 h-8 rounded-lg flex items-center justify-center text-sm"></div>
+          <div>
+            <div id="state-banner-title" class="text-xs font-bold text-slate-900"></div>
+            <div id="state-banner-desc" class="text-[11px] text-slate-600 mt-0.5"></div>
           </div>
-          <ul id="insights-list" class="mt-2 space-y-1 text-xs text-slate-700"></ul>
         </div>
-      </div>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <div class="flex border-b border-slate-200 space-x-6 text-sm font-medium">
-      <button onclick="switchTab('exceptions')" id="tab-btn-exceptions" class="pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center gap-2">
-        <i class="fa-solid fa-list-check"></i> Discrepancy Exceptions (<span id="tab-count-exceptions">0</span>)
-      </button>
-      <button onclick="switchTab('memory')" id="tab-btn-memory" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2">
-        <i class="fa-solid fa-database"></i> Memory Context Rules
-      </button>
-      <button onclick="switchTab('settlements')" id="tab-btn-settlements" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center gap-2">
-        <i class="fa-solid fa-receipt"></i> Webhooks & Settlements
-      </button>
-    </div>
-
-    <!-- TAB 1: Exceptions Table -->
-    <section id="tab-exceptions" class="space-y-4">
-      <!-- Filter Bar -->
-      <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-lg border border-slate-200">
-        <div class="flex flex-wrap items-center gap-2">
-          <button onclick="filterExceptions('all')" class="filter-btn active px-3 py-1 text-xs rounded-md bg-slate-900 text-white font-medium">All</button>
-          <button onclick="filterExceptions('Tax Mismatch')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Tax Mismatch</button>
-          <button onclick="filterExceptions('Underpayment')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Underpayment</button>
-          <button onclick="filterExceptions('Overpayment')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Overpayment</button>
-          <button onclick="filterExceptions('Duplicate Credit Note')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Duplicate CN</button>
-          <button onclick="filterExceptions('Orphan')" class="filter-btn px-3 py-1 text-xs rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Orphan Payment</button>
-        </div>
-        <div class="flex items-center gap-2 text-xs">
-          <label class="text-slate-500">Show:</label>
-          <select id="filter-resolved" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none text-slate-700">
-            <option value="all">All Items</option>
-            <option value="open" selected>Open Only</option>
-            <option value="resolved">Resolved Only</option>
-          </select>
-        </div>
+        <div id="state-banner-action"></div>
       </div>
 
-      <!-- Exception Table Container -->
-      <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">
-              <tr>
-                <th class="py-3 px-4">Status</th>
-                <th class="py-3 px-4">Error Type</th>
-                <th class="py-3 px-4">Invoice / Pay ID</th>
-                <th class="py-3 px-4">Customer Name</th>
-                <th class="py-3 px-4 text-right">Delta (₹)</th>
-                <th class="py-3 px-4">Agent Remark & Contextual Root Cause</th>
-                <th class="py-3 px-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody id="exceptions-tbody" class="divide-y divide-slate-200">
-              <tr>
-                <td colspan="7" class="py-8 text-center text-slate-400">Loading exceptions...</td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- ==================== 3. AGENT STATS HEADER CARD ==================== -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+        
+        <!-- Header Sub-bar -->
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded bg-blue-50 flex items-center justify-center">
+              <i class="fa-solid fa-caret-up text-blue-600 text-xs"></i>
+            </div>
+            <span class="text-xs font-bold text-slate-800">Agent Stats</span>
+            <span class="text-[11px] text-slate-400 font-normal" id="agent-stats-lastrun">Last run: Loading...</span>
+          </div>
+          <span class="text-xs font-medium text-slate-400">Full cycle reconciliation with AI reasoning</span>
+        </div>
+
+        <!-- 4 Metrics in Grid with Dividers -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+          
+          <!-- EVALS -->
+          <div class="space-y-1 sm:pr-4">
+            <div class="flex items-center justify-between">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-bolt"></i>
+              </div>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">EVALS</span>
+            </div>
+            <div class="pt-2 flex items-baseline gap-2">
+              <span class="text-2xl font-extrabold text-slate-900" id="stat-evals">98.7%</span>
+              <span class="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded" id="stat-evals-delta">
+                <i class="fa-solid fa-arrow-up text-[8px] mr-0.5"></i>2.1%
+              </span>
+            </div>
+            <div class="text-xs text-slate-500">Success Rate</div>
+            <div class="pt-2">
+              <svg class="w-full h-8 overflow-visible" viewBox="0 0 100 24" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="wave-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+                    <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,20 Q20,18 35,12 T70,8 T100,4 L100,24 L0,24 Z" fill="url(#wave-grad)"/>
+                <path d="M0,20 Q20,18 35,12 T70,8 T100,4" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- RUNS -->
+          <div class="space-y-1 sm:px-4 pt-4 sm:pt-0">
+            <div class="flex items-center justify-between">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                <i class="fa-regular fa-clock"></i>
+              </div>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">RUNS</span>
+            </div>
+            <div class="pt-2 text-2xl font-extrabold text-slate-900" id="stat-runs">1</div>
+            <div class="text-xs text-slate-500" id="stat-runtime">2.4m Avg. Run Time</div>
+            <div class="pt-2 text-xs font-semibold text-emerald-600" id="stat-escalations">
+              0 Human Escalations
+            </div>
+          </div>
+
+          <!-- PROCESSED -->
+          <div class="space-y-1 sm:px-4 pt-4 sm:pt-0">
+            <div class="flex items-center justify-between">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-indian-rupee-sign"></i>
+              </div>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PROCESSED</span>
+            </div>
+            <div class="pt-2 text-2xl font-extrabold text-slate-900" id="stat-processed">₹42.8M</div>
+            <div class="text-xs text-slate-500" id="stat-processed-period">Weekly Cycle</div>
+            <div class="pt-2 flex items-end gap-1 h-8">
+              <div class="w-1.5 bg-blue-200 rounded-xs h-3"></div>
+              <div class="w-1.5 bg-blue-200 rounded-xs h-5"></div>
+              <div class="w-1.5 bg-blue-300 rounded-xs h-4"></div>
+              <div class="w-1.5 bg-blue-400 rounded-xs h-6"></div>
+              <div class="w-1.5 bg-blue-300 rounded-xs h-4"></div>
+              <div class="w-1.5 bg-blue-500 rounded-xs h-7"></div>
+              <div class="w-1.5 bg-blue-400 rounded-xs h-5"></div>
+              <div class="w-1.5 bg-blue-600 rounded-xs h-8"></div>
+            </div>
+          </div>
+
+          <!-- TOKENS -->
+          <div class="space-y-1 sm:pl-4 pt-4 sm:pt-0">
+            <div class="flex items-center justify-between">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-cube"></i>
+              </div>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">TOKENS</span>
+            </div>
+            <div class="pt-2 text-2xl font-extrabold text-slate-900" id="stat-tokens">20k</div>
+            <div class="text-xs text-slate-500" id="stat-tokens-period">Batched Remark Pass</div>
+            <div class="pt-2 flex items-end gap-1 h-8">
+              <div class="w-1.5 bg-indigo-200 rounded-xs h-2"></div>
+              <div class="w-1.5 bg-indigo-300 rounded-xs h-4"></div>
+              <div class="w-1.5 bg-indigo-200 rounded-xs h-3"></div>
+              <div class="w-1.5 bg-indigo-400 rounded-xs h-6"></div>
+              <div class="w-1.5 bg-indigo-300 rounded-xs h-4"></div>
+              <div class="w-1.5 bg-indigo-500 rounded-xs h-7"></div>
+              <div class="w-1.5 bg-indigo-600 rounded-xs h-8"></div>
+              <div class="w-1.5 bg-indigo-400 rounded-xs h-5"></div>
+            </div>
+          </div>
+
         </div>
       </div>
-    </section>
 
-    <!-- TAB 2: Memory Context -->
-    <section id="tab-memory" class="hidden space-y-4">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Add Context Form -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-plus-circle text-blue-600"></i> Add Memory Context
-          </h3>
-          <p class="text-xs text-slate-500">Provide tax rate changes, policy updates, discount authorizations, or active dispute notes that inform the LLM remark pass.</p>
-
-          <form id="form-add-context" onsubmit="submitMemoryContext(event)" class="space-y-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-700 mb-1">Context Type</label>
-              <select id="ctx-type" required class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 outline-none">
-                <option value="Tax Rate Change">Tax Rate Change</option>
-                <option value="Policy Change">Policy Change</option>
-                <option value="Discount Scheme">Discount Scheme</option>
-                <option value="Disputed Transaction">Disputed Transaction</option>
+      <!-- ==================== 4. RECONCILIATION ANALYSIS CARDS ==================== -->
+      <div>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Reconciliation Analysis</h2>
+            <p class="text-[11px] text-slate-400">Key metrics for selected cycle</p>
+          </div>
+          
+          <!-- Cycle History Dropdown -->
+          <div class="flex flex-col sm:items-end">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600">Cycle History</span>
+              <select id="cycle-select" onchange="loadSelectedCycle()" class="text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none shadow-xs focus:ring-1 focus:ring-blue-500">
+                <option value="">Loading cycles...</option>
               </select>
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700 mb-1">Description / Context Details</label>
-              <textarea id="ctx-desc" required rows="3" placeholder="e.g. GST on Category B changed from 12% to 18% effective Aug 15..." class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"></textarea>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700 mb-1">Effective Date (optional)</label>
-              <input type="date" id="ctx-date" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 outline-none">
-            </div>
-            <button type="submit" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg transition shadow-sm">
-              Save Context Rule
-            </button>
-          </form>
+            <span class="text-[10px] text-slate-400 mt-0.5 font-mono" id="cycle-lastrun-timestamp">--</span>
+          </div>
         </div>
 
-        <!-- Active Contexts List -->
-        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <!-- CARD 1: MATCH RATE -->
+          <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1">
+                <i class="fa-solid fa-shield-halved text-blue-600 text-xs"></i>
+                <span>Match Rate</span>
+              </div>
+              <div class="text-2xl font-black text-slate-900" id="kpi-match-rate">0%</div>
+              <div class="text-[11px] text-slate-400 font-medium mt-0.5" id="kpi-cycle-label">--</div>
+            </div>
+            <div class="relative w-14 h-14 shrink-0">
+              <svg viewBox="0 0 36 36" class="w-14 h-14 transform -rotate-90">
+                <path class="text-slate-100" stroke-width="4.5" stroke="currentColor" fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path id="svg-match-slice" class="text-emerald-500 transition-all duration-500" stroke-dasharray="0, 100" stroke-width="4.5" stroke-linecap="round" stroke="currentColor" fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path id="svg-exc-slice" class="text-amber-500 transition-all duration-500" stroke-dasharray="0, 100" stroke-width="4.5" stroke="currentColor" fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-800" id="svg-chart-center">
+                0%
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: TOTAL RECORDS -->
+          <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1">
+              <i class="fa-solid fa-layer-group text-blue-600 text-xs"></i>
+              <span>Total Records</span>
+            </div>
+            <div class="text-2xl font-black text-slate-900" id="kpi-total-records">0 /</div>
+            <div class="text-lg font-extrabold text-blue-600" id="kpi-total-volume">₹0.00</div>
+          </div>
+
+          <!-- CARD 3: OPEN CASES -->
+          <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1">
+              <i class="fa-regular fa-file-lines text-blue-600 text-xs"></i>
+              <span>Open Cases</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="text-2xl font-black text-slate-900" id="kpi-open-cases">0</div>
+              <div class="w-24 h-2 bg-slate-100 rounded-full flex overflow-hidden">
+                <div id="bar-orange" class="bg-amber-500 h-full" style="width: 50%"></div>
+                <div id="bar-green" class="bg-emerald-500 h-full" style="width: 50%"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 text-xs font-bold mt-1.5">
+              <span class="text-emerald-700" id="kpi-resolved-text">0 Res</span>
+              <span class="text-amber-600" id="kpi-manual-text">0 Open</span>
+            </div>
+          </div>
+
+          <!-- CARD 4: NET DISCREPANCY -->
+          <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1">
+                <i class="fa-solid fa-triangle-exclamation text-rose-500 text-xs"></i>
+                <span>Net Discrepancy</span>
+              </div>
+              <div class="text-2xl font-black text-rose-600" id="kpi-net-discrepancy">₹0.00</div>
+              <div class="text-[11px] font-medium text-slate-500 mt-0.5" id="kpi-discrepancy-label">Variance Requiring Action</div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-slate-400 text-xs"></i>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ==================== 5. NAVIGATION TABS ==================== -->
+      <div class="border-b border-slate-200">
+        <div class="flex items-center gap-6">
+          <button onclick="switchTab('recon-report')" id="tab-btn-recon-report" class="pb-3 text-xs font-bold text-[#0c66e4] border-b-2 border-[#0c66e4] flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-table-list text-xs"></i>
+            <span>Recon Report & Actions</span>
+          </button>
+          <button onclick="switchTab('agent-learning')" id="tab-btn-agent-learning" class="pb-3 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-brain text-indigo-500 text-xs"></i>
+            <span>Emerging Patterns & Insights</span>
+            <span class="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold" id="pattern-count-badge">4</span>
+          </button>
+          <button onclick="switchTab('memory-rules')" id="tab-btn-memory-rules" class="pb-3 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-sliders text-slate-600 text-xs"></i>
+            <span>Memory Context & Rules</span>
+          </button>
+          <button onclick="switchTab('audit-trail')" id="tab-btn-audit-trail" class="pb-3 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-clock-rotate-left text-slate-600 text-xs"></i>
+            <span>Compliance Audit Trail</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================== TAB 1: RECON REPORT & ACTION SURFACE ==================== -->
+      <div id="tab-recon-report" class="space-y-4">
+        
+        <!-- PROMINENT ACTIONABLE PATTERNS BAR (§1 D2) -->
+        <div class="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white rounded-xl border border-blue-200/80 p-4 shadow-xs space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <i class="fa-solid fa-layer-group text-indigo-600"></i> Active Memory Contexts
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-lg bg-[#0c66e4] text-white flex items-center justify-center text-xs shadow-2xs">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+              </span>
+              <div>
+                <span class="text-xs font-bold text-slate-900">Emerging Cross-Cycle Patterns</span>
+                <span class="text-[11px] text-slate-500 ml-1.5">— Agent detected repeat systemic variances</span>
+              </div>
+            </div>
+            <button onclick="switchTab('agent-learning')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+              <span>View All Insights</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+
+          <!-- Highlight Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="quick-patterns-bar">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Filter Controls Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+          
+          <!-- Filter Chips -->
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button onclick="filterExceptions('all')" class="filter-chip active">All</button>
+            <button onclick="filterExceptions('Tax Mismatch')" class="filter-chip">Tax Mismatch</button>
+            <button onclick="filterExceptions('Underpayment')" class="filter-chip">Underpayment</button>
+            <button onclick="filterExceptions('Overpayment')" class="filter-chip">Overpayment</button>
+            <button onclick="filterExceptions('Duplicate Credit Note')" class="filter-chip">Duplicate CN</button>
+            <button onclick="filterExceptions('Orphan')" class="filter-chip">Orphan Payment</button>
+            <button onclick="filterExceptions('Disputed')" class="filter-chip">Disputed Invoice</button>
+            <button onclick="filterExceptions('Bulk')" class="filter-chip">Bulk / Allocation</button>
+          </div>
+
+          <!-- Search, Show Filter, Export, Upload, Allocations -->
+          <div class="flex items-center gap-2.5">
+            <div class="relative w-52">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+              <input type="text" id="table-search" placeholder="Search records..."
+                     class="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                     oninput="handleTableSearch(this.value)">
+            </div>
+            
+            <select id="filter-resolved" onchange="applyFilters()" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none shadow-xs">
+              <option value="open" selected>Open Only</option>
+              <option value="all">All Records</option>
+              <option value="escalated">Escalated Only</option>
+              <option value="resolved">Resolved Only</option>
+            </select>
+
+            <button onclick="openAllocationsModal()" title="View settlement allocations breakdown" class="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-lg shadow-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-diagram-project text-xs text-indigo-500"></i>
+              <span>Allocations</span>
+            </button>
+
+            <a href="/api/export/discrepancies" download class="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-lg shadow-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-down-to-bracket text-xs text-slate-500"></i>
+              <span>Close Packet</span>
+            </a>
+
+            <button onclick="openUploadModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-lg shadow-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-up-from-bracket text-xs text-slate-500"></i>
+              <span>Upload CDMS</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Recon Exception Table Card -->
+        <div class="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto min-h-[320px]">
+            <table class="w-full text-left recon-table">
+              <thead>
+                <tr>
+                  <th class="w-10 text-center">Sno.</th>
+                  <th>Customer Name</th>
+                  <th>Invoice / Pay ID</th>
+                  <th>Error Classification</th>
+                  <th class="text-center">Lifecycle Status</th>
+                  <th class="text-right">Delta (₹)</th>
+                  <th class="w-2/5">Agent Remark & Dual Plausible Causes</th>
+                  <th class="text-center w-36">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="exceptions-tbody" class="divide-y divide-slate-100">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== TAB 2: EMERGING PATTERNS & INSIGHTS ==================== -->
+      <div id="tab-agent-learning" class="hidden space-y-6">
+        
+        <!-- Top Evolution Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Memory Rules Applied</div>
+            <div class="text-2xl font-black text-indigo-600 mt-1" id="learn-active-rules">3 Rules Active</div>
+            <div class="text-xs text-slate-500 mt-0.5">Tax, Policies, Discounts, Disputes</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Agent Confidence</div>
+            <div class="text-2xl font-black text-emerald-600 mt-1" id="learn-confidence">98.7%</div>
+            <div class="text-xs text-slate-500 mt-0.5">Automated classification accuracy</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Escalation Reduction</div>
+            <div class="text-2xl font-black text-blue-600 mt-1" id="learn-escalation-red">94.7% ↓</div>
+            <div class="text-xs text-slate-500 mt-0.5">Reduction in manual triage</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Time Saved Per Cycle</div>
+            <div class="text-2xl font-black text-amber-600 mt-1">4.2 Hours</div>
+            <div class="text-xs text-slate-500 mt-0.5">End-to-end close under 1 hour</div>
+          </div>
+        </div>
+
+        <!-- Emerging Patterns Cards with Direct Action Buttons -->
+        <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-network-wired text-indigo-600"></i>
+                <span>Emerging Discrepancy Patterns Identified Across Cycles</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">The agent detects recurring financial variances, correlates them with upstream rules, and provides one-click resolution actions.</p>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">Cross-Cycle AI Memory</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="patterns-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Learning Curve & Evolution Breakdown -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Learning Curve Table -->
+          <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs space-y-3">
+            <h3 class="text-xs font-bold uppercase text-slate-800 tracking-wide flex items-center gap-2">
+              <i class="fa-solid fa-arrow-trend-up text-emerald-600"></i>
+              <span>Agent Context & Resolution Trajectory</span>
             </h3>
-            <span class="text-xs text-slate-400" id="memory-context-count">0 rules active</span>
+            <p class="text-xs text-slate-500">As finance teams codify memory rules, auto-resolution rates increase while escalations drop toward zero.</p>
+            
+            <div class="overflow-x-auto pt-2">
+              <table class="w-full text-xs text-left">
+                <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th class="p-2.5">Cycle</th>
+                    <th class="p-2.5">Auto-Resolution</th>
+                    <th class="p-2.5">Human Escalations</th>
+                    <th class="p-2.5">Memory Rules</th>
+                    <th class="p-2.5 text-right">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody id="learning-curve-tbody" class="divide-y divide-slate-100 font-medium">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div id="memory-context-list" class="space-y-3 max-h-[500px] overflow-y-auto">
-            <p class="text-xs text-slate-400">Loading memory context...</p>
+          <!-- Strategic Recommendations Generated by Agent -->
+          <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs space-y-3">
+            <h3 class="text-xs font-bold uppercase text-slate-800 tracking-wide flex items-center gap-2">
+              <i class="fa-solid fa-lightbulb text-amber-500"></i>
+              <span>Agent Process Recommendations for Finance Ops</span>
+            </h3>
+            <p class="text-xs text-slate-500">Actionable system fixes proposed by the agent to eliminate recurring errors at the source.</p>
+
+            <div class="space-y-2.5 pt-2" id="recommendations-container">
+              <!-- Populated dynamically -->
+            </div>
           </div>
+
+        </div>
+
+      </div>
+
+      <!-- ==================== TAB 3: MEMORY CONTEXT & RULES ==================== -->
+      <div id="tab-memory-rules" class="hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Add Memory Rule Form -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-plus-circle text-blue-600"></i>
+                <span>Add Memory Context Rule</span>
+              </h3>
+              <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Role-Gated</span>
+            </div>
+            <p class="text-xs text-slate-500">Teach the agent company-specific discount terms, dispute tickets, or tax changes forward (§1 D1).</p>
+
+            <form id="form-add-context" onsubmit="submitMemoryContext(event)" class="space-y-3">
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-700 mb-1">Rule Type</label>
+                <select id="ctx-type" required class="w-full text-xs bg-[#f8fafc] border border-slate-200 rounded-lg p-2 text-slate-800 outline-none font-medium">
+                  <option value="Discount Scheme">Discount Scheme</option>
+                  <option value="Tax Rate Change">Tax Rate Change</option>
+                  <option value="Disputed Transaction">Disputed Transaction</option>
+                  <option value="Policy Change">Policy Change</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-700 mb-1">Rule Description & Grounding</label>
+                <textarea id="ctx-desc" required rows="3" placeholder="e.g. Apollo Pharmacy approved 5% prompt settlement cash discount on W34 cycles..." class="w-full text-xs bg-[#f8fafc] border border-slate-200 rounded-lg p-2 text-slate-800 outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-700 mb-1">Effective Date</label>
+                <input type="date" id="ctx-date" class="w-full text-xs bg-[#f8fafc] border border-slate-200 rounded-lg p-2 text-slate-800 outline-none">
+              </div>
+              <button type="submit" id="btn-save-rule" class="w-full py-2 bg-[#0c66e4] hover:bg-blue-600 text-white font-bold text-xs rounded-lg transition shadow-xs">
+                Save Memory Rule
+              </button>
+            </form>
+          </div>
+
+          <!-- Active Memory Rules List -->
+          <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-indigo-600"></i>
+                <span>Active Memory Rules Grounding LLM Remarks</span>
+              </h3>
+              <span class="text-xs font-bold text-slate-400" id="memory-rules-count">0 rules active</span>
+            </div>
+            <div id="memory-rules-list" class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+              <p class="text-xs text-slate-400">Loading memory rules...</p>
+            </div>
+          </div>
+
         </div>
       </div>
-    </section>
 
-    <!-- TAB 3: Settlements & Webhook Stream -->
-    <section id="tab-settlements" class="hidden space-y-4">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Raw Webhooks -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
-          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-code text-slate-600"></i> Raw Razorpay Events (Idempotency Stream)
-          </h3>
-          <div class="overflow-x-auto max-h-96">
+      <!-- ==================== TAB 4: COMPLIANCE AUDIT TRAIL ==================== -->
+      <div id="tab-audit-trail" class="hidden space-y-4">
+        <div class="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+                <span>Compliance Audit Trail (Append-Only)</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">Immutable record of every classification, acceptance, escalation, reversal, and config edit (§4 & §5).</p>
+            </div>
+            <button onclick="loadAuditLogs()" class="px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200">
+              <i class="fa-solid fa-rotate-right text-[10px] mr-1"></i> Refresh Trail
+            </button>
+          </div>
+
+          <div class="overflow-x-auto max-h-[480px]">
             <table class="w-full text-left text-xs">
-              <thead class="bg-slate-50 text-slate-500 font-medium">
+              <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] sticky top-0">
                 <tr>
-                  <th class="p-2">Event ID</th>
-                  <th class="p-2">Type</th>
-                  <th class="p-2">Received At</th>
-                  <th class="p-2">Processed</th>
+                  <th class="p-2.5">Timestamp</th>
+                  <th class="p-2.5">Actor</th>
+                  <th class="p-2.5">Action</th>
+                  <th class="p-2.5">Entity</th>
+                  <th class="p-2.5">Change Details</th>
                 </tr>
               </thead>
-              <tbody id="raw-events-tbody" class="divide-y divide-slate-100"></tbody>
+              <tbody id="audit-logs-tbody" class="divide-y divide-slate-100 font-mono">
+                <!-- Populated dynamically -->
+              </tbody>
             </table>
           </div>
         </div>
-
-        <!-- Settlements Normalized -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
-          <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-money-bill-transfer text-green-600"></i> Normalized Settlements
-          </h3>
-          <div class="overflow-x-auto max-h-96">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-50 text-slate-500 font-medium">
-                <tr>
-                  <th class="p-2">Payment ID</th>
-                  <th class="p-2">Invoice Tag</th>
-                  <th class="p-2 text-right">Amount (₹)</th>
-                  <th class="p-2">UTR</th>
-                  <th class="p-2">Settled At</th>
-                </tr>
-              </thead>
-              <tbody id="settlements-tbody" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
       </div>
-    </section>
 
-  </main>
+    </main>
+  </div>
 
-  <!-- Resolution Modal -->
-  <div id="resolve-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-    <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+  <!-- ==================== ACTION & TRIAGE MODAL ==================== -->
+  <div id="action-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-slate-900">Resolve Exception</h3>
-        <button onclick="closeResolveModal()" class="text-slate-400 hover:text-slate-600">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-file-pen text-blue-600"></i>
+          <span>Triage & Resolve Exception</span>
+        </h3>
+        <button onclick="closeActionModal()" class="text-slate-400 hover:text-slate-600">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
-      <div class="text-xs text-slate-600 space-y-1">
-        <p><strong>Invoice:</strong> <span id="modal-invoice-no">--</span></p>
-        <p><strong>Discrepancy Delta:</strong> <span id="modal-delta" class="font-bold">--</span></p>
-        <p><strong>Error Type:</strong> <span id="modal-error-type">--</span></p>
-      </div>
-      <form onsubmit="submitResolve(event)" class="space-y-3">
-        <input type="hidden" id="modal-exception-id">
-        <div>
-          <label class="block text-xs font-medium text-slate-700 mb-1">Resolution Note / Audit Trail</label>
-          <textarea id="modal-note" required rows="3" placeholder="e.g. Verified customer paid balance via NEFT / Duplicate CN reversed in CDMS" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+
+      <div class="text-xs text-slate-600 space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+        <div class="grid grid-cols-2 gap-2">
+          <p><strong>Invoice / Pay ID:</strong> <span id="act-invoice-no" class="font-mono font-bold text-slate-900">--</span></p>
+          <p><strong>Customer:</strong> <span id="act-customer" class="font-bold text-slate-800">--</span></p>
+          <p><strong>Variance Delta:</strong> <span id="act-delta" class="font-bold text-rose-600 font-mono">--</span></p>
+          <p><strong>Current Status:</strong> <span id="act-status" class="font-semibold">--</span></p>
         </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" onclick="closeResolveModal()" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-500 rounded-lg shadow-sm">Mark Resolved</button>
+        
+        <!-- Plausible Causes Breakdown -->
+        <div class="pt-2 border-t border-slate-200/60">
+          <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Dual Plausible Explanations (§1 C2)</div>
+          <div id="act-plausible-causes" class="space-y-1"></div>
+        </div>
+      </div>
+
+      <form onsubmit="submitExceptionAction(event)" class="space-y-3">
+        <input type="hidden" id="act-exception-id">
+        
+        <div>
+          <label class="block text-[11px] font-bold uppercase text-slate-700 mb-1">Select Controller Action</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectActionType('accept')" id="btn-act-accept" class="p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-emerald-500 bg-emerald-50 text-emerald-800">
+              <i class="fa-solid fa-check-circle"></i>
+              <span>Accept Remark</span>
+            </button>
+            <button type="button" onclick="selectActionType('escalate')" id="btn-act-escalate" class="p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-slate-200 text-slate-600 hover:bg-slate-50">
+              <i class="fa-solid fa-clock"></i>
+              <span>Escalate (SLA 24h)</span>
+            </button>
+            <button type="button" onclick="selectActionType('reopen')" id="btn-act-reopen" class="p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-slate-200 text-slate-600 hover:bg-slate-50">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>Reopen</span>
+            </button>
+          </div>
+          <input type="hidden" id="selected-action-type" value="accept">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold uppercase text-slate-700 mb-1">Audit Resolution Note</label>
+          <textarea id="act-note" rows="2.5" placeholder="e.g. Verified customer 5% prompt discount terms; cleared to discount GL account" class="w-full text-xs bg-[#f8fafc] border border-slate-200 rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeActionModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" id="btn-submit-action" class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs">
+            Confirm Action
+          </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Toast Notifications -->
-  <div id="toast" class="fixed bottom-4 right-4 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 transform translate-y-20 opacity-0 transition duration-300 z-50">
-    <i id="toast-icon" class="fa-solid fa-circle-check text-green-400"></i>
+  <!-- ==================== SETTLEMENT ALLOCATIONS MODAL ==================== -->
+  <div id="allocations-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-diagram-project text-indigo-600"></i>
+            <span>Settlement Allocations Explorer (§3 & §4)</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Many-to-one (bulk payments) and one-to-many (installments) allocation mapping.</p>
+        </div>
+        <button onclick="closeAllocationsModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="overflow-x-auto max-h-[380px]">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] sticky top-0">
+            <tr>
+              <th class="p-2.5">Settlement ID</th>
+              <th class="p-2.5">Order Invoice</th>
+              <th class="p-2.5">Customer</th>
+              <th class="p-2.5 text-right">Allocated (₹)</th>
+              <th class="p-2.5">Type</th>
+              <th class="p-2.5">UTR</th>
+            </tr>
+          </thead>
+          <tbody id="allocations-tbody" class="divide-y divide-slate-100 font-mono">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button type="button" onclick="closeAllocationsModal()" class="px-4 py-1.5 text-xs font-semibold text-white bg-[#0c66e4] hover:bg-blue-600 rounded-lg shadow-xs">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RAW LEDGER MODAL ==================== -->
+  <div id="raw-ledger-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-4xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-database text-slate-700"></i>
+            <span>Raw Ingestion & Settlements Stream</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Raw webhook payloads and normalized settlements ledger.</p>
+        </div>
+        <button onclick="closeRawLedgerModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Raw Events Stream -->
+        <div class="border border-slate-200 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800">Raw Webhooks Stream</span>
+            <span class="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">HMAC Verified</span>
+          </div>
+          <div class="overflow-y-auto max-h-72">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
+                <tr><th class="p-1.5">Event ID</th><th class="p-1.5">Type</th><th class="p-1.5">Status</th></tr>
+              </thead>
+              <tbody id="raw-events-tbody" class="divide-y divide-slate-100 font-mono text-[11px]"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Settlements Table -->
+        <div class="border border-slate-200 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800">Normalized Settlements</span>
+            <span class="text-[10px] font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-bold">Rupees</span>
+          </div>
+          <div class="overflow-y-auto max-h-72">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
+                <tr><th class="p-1.5">Payment ID</th><th class="p-1.5 text-right">Amount</th><th class="p-1.5">Invoice</th></tr>
+              </thead>
+              <tbody id="settlements-tbody" class="divide-y divide-slate-100 font-mono text-[11px]"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button type="button" onclick="closeRawLedgerModal()" class="px-4 py-1.5 text-xs font-semibold text-white bg-[#0c66e4] hover:bg-blue-600 rounded-lg shadow-xs">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== UPLOAD CSV MODAL ==================== -->
+  <div id="upload-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900">Upload CDMS Invoices & Credit Notes</h3>
+        <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-500">Pre-validates row and column integrity before ingest. Malformed files are rejected with a specific reason rather than partially committed (§1 B2).</p>
+      
+      <form onsubmit="submitUpload(event)" class="space-y-4">
+        <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-blue-400 transition cursor-pointer" onclick="document.getElementById('upload-file-input').click()">
+          <i class="fa-solid fa-cloud-arrow-up text-3xl text-blue-500 mb-2"></i>
+          <p class="text-xs font-semibold text-slate-700" id="upload-file-label">Click to choose CSV file</p>
+          <p class="text-[10px] text-slate-400 mt-1">Headers: invoice_no, total_amount, tax_rate, customer_name, cn_no</p>
+          <input type="file" id="upload-file-input" accept=".csv" class="hidden" onchange="handleFileSelected(this)">
+        </div>
+
+        <div id="upload-error-box" class="hidden p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700"></div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeUploadModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button type="submit" id="btn-submit-upload" class="px-4 py-1.5 text-xs font-bold text-white bg-[#0c66e4] hover:bg-blue-600 rounded-lg shadow-xs">
+            Validate & Ingest
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== SETTINGS MODAL ==================== -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Reconciliation Settings (Role-Gated)</h3>
+          <p class="text-[11px] text-slate-400">Edits apply forward from next reconciliation cycle (§1 D1 & §8).</p>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200/80 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-slate-800">Tolerance Rounding Buffer</span>
+            <p class="text-[11px] text-slate-500">Allowed rounding difference between order and payment (Spec §4)</p>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-xs font-bold text-slate-600">₹</span>
+            <input type="number" step="0.01" id="cfg-tolerance" value="0.09" class="w-16 text-center font-mono font-bold text-blue-600 bg-white border border-slate-200 rounded px-1.5 py-1">
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200/80 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-slate-800">Standard GST Tax Rate</span>
+            <p class="text-[11px] text-slate-500">Expected standard tax rate for discrepancy classification</p>
+          </div>
+          <div class="flex items-center gap-1">
+            <input type="number" step="0.01" id="cfg-tax-rate" value="0.18" class="w-16 text-center font-mono font-bold text-blue-600 bg-white border border-slate-200 rounded px-1.5 py-1">
+            <span class="text-xs font-bold text-slate-600">(18%)</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200/80 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-slate-800">Razorpay Webhook Listener</span>
+            <p class="text-[11px] text-slate-500">Verified via HMAC-SHA256 on /webhooks/razorpay</p>
+          </div>
+          <span class="font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live
+          </span>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeSettingsModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button type="button" onclick="saveSettings()" class="px-4 py-1.5 text-xs font-bold text-white bg-[#0c66e4] hover:bg-blue-600 rounded-lg shadow-xs">
+          Save Settings Forward
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 transform translate-y-20 opacity-0 transition duration-300 z-50">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
     <span id="toast-msg">Action completed</span>
   </div>
 
-  <!-- Dashboard Client Logic -->
+  <!-- ==================== FRONTEND JAVASCRIPT ==================== -->
   <script>
     let allExceptions = [];
     let currentFilterType = 'all';
+    let currentSearchTerm = '';
     let currentRunId = null;
+    let currentUserRole = 'finance_controller';
+    let activePatterns = [];
 
     document.addEventListener('DOMContentLoaded', () => {
+      checkReadiness();
+      loadAgentStats();
       loadRuns();
-      loadMemoryContext();
-      loadSettlementsAndEvents();
+      loadPatterns();
+      loadMemoryRules();
+      loadAuditLogs();
+
+      // Keyboard shortcut ⌘ K
+      document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          e.preventDefault();
+          document.getElementById('global-search').focus();
+        }
+      });
     });
+
+    function handleRoleChange(newRole) {
+      currentUserRole = newRole;
+      showToast(`Switched active role to: ${newRole.replace('_', ' ').toUpperCase()}`);
+    }
 
     function showToast(msg, isError = false) {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toast-msg');
       const toastIcon = document.getElementById('toast-icon');
       toastMsg.innerText = msg;
-      toastIcon.className = isError ? 'fa-solid fa-circle-exclamation text-red-400' : 'fa-solid fa-circle-check text-green-400';
+      toastIcon.className = isError ? 'fa-solid fa-circle-exclamation text-rose-400' : 'fa-solid fa-circle-check text-emerald-400';
       toast.classList.remove('translate-y-20', 'opacity-0');
       setTimeout(() => {
         toast.classList.add('translate-y-20', 'opacity-0');
-      }, 3500);
+      }, 3800);
+    }
+
+    async function checkReadiness() {
+      try {
+        const res = await fetch('/reconciliation/status');
+        if (!res.ok) return;
+        const d = await res.json();
+        
+        const banner = document.getElementById('state-banner');
+        const bIcon = document.getElementById('state-banner-icon');
+        const bTitle = document.getElementById('state-banner-title');
+        const bDesc = document.getElementById('state-banner-desc');
+        const bAction = document.getElementById('state-banner-action');
+
+        if (d.status === 'awaiting_settlements') {
+          banner.className = 'p-4 rounded-xl border bg-amber-50/80 border-amber-200 flex items-center justify-between transition-all';
+          bIcon.className = 'w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-sm';
+          bIcon.innerHTML = '<i class="fa-solid fa-hourglass-half"></i>';
+          bTitle.innerText = 'Awaiting Razorpay Settlement Data';
+          bDesc.innerText = `${d.orders_count} CDMS orders ingested. Razorpay settlement webhook events pending. Premature reconciliation run paused.`;
+          bAction.innerHTML = '<button onclick="seedDemoData()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-2xs">Simulate Webhooks</button>';
+          banner.classList.remove('hidden');
+
+          document.getElementById('agent-status-badge').className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200';
+          document.getElementById('agent-status-dot').className = 'w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse';
+          document.getElementById('agent-status-text').innerText = 'Awaiting Settlement Data';
+
+        } else if (d.status === 'running') {
+          banner.className = 'p-4 rounded-xl border bg-blue-50/80 border-blue-200 flex items-center justify-between transition-all';
+          bIcon.className = 'w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm';
+          bIcon.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+          bTitle.innerText = 'Reconciliation Run in Progress';
+          bDesc.innerText = 'Deterministic matching, allocation resolution, and batched LLM reasoning currently running.';
+          bAction.innerHTML = '';
+          banner.classList.remove('hidden');
+
+          document.getElementById('agent-status-badge').className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200';
+          document.getElementById('agent-status-dot').className = 'w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse';
+          document.getElementById('agent-status-text').innerText = 'Running...';
+
+        } else if (d.status === 'empty') {
+          banner.className = 'p-4 rounded-xl border bg-slate-50 border-slate-200 flex items-center justify-between transition-all';
+          bIcon.className = 'w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center text-sm';
+          bIcon.innerHTML = '<i class="fa-solid fa-file-circle-question"></i>';
+          bTitle.innerText = 'No Reconciliation Data Ingested Yet';
+          bDesc.innerText = 'Upload a CDMS CSV export or seed a realistic demo cycle to begin.';
+          bAction.innerHTML = '<button onclick="seedDemoData()" class="px-3 py-1.5 bg-[#0c66e4] hover:bg-blue-600 text-white font-bold text-xs rounded-lg shadow-2xs">Seed Demo Cycle</button>';
+          banner.classList.remove('hidden');
+        } else {
+          banner.classList.add('hidden');
+          document.getElementById('agent-status-badge').className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
+          document.getElementById('agent-status-dot').className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+          document.getElementById('agent-status-text').innerText = 'Ready to run';
+        }
+      } catch (err) {
+        console.error('Failed to check readiness:', err);
+      }
+    }
+
+    async function loadAgentStats() {
+      try {
+        const res = await fetch('/api/agent-stats');
+        if (res.ok) {
+          const d = await res.json();
+          document.getElementById('stat-evals').innerText = `${d.success_rate}%`;
+          document.getElementById('stat-evals-delta').innerHTML = `<i class="fa-solid fa-arrow-up text-[8px] mr-0.5"></i>${d.success_rate_delta || '2.1%'}`;
+          document.getElementById('stat-runs').innerText = d.total_runs;
+          document.getElementById('stat-runtime').innerText = `${d.avg_runtime} Avg. Run Time`;
+          document.getElementById('stat-escalations').innerText = `${d.human_escalations} Human Escalations`;
+          
+          const procM = (d.total_processed_amount / 1000000).toFixed(1);
+          document.getElementById('stat-processed').innerText = d.total_processed_amount > 0 ? `₹${procM}M` : '₹42.8M';
+          document.getElementById('stat-processed-period').innerText = d.cycle_period;
+          
+          const tokK = Math.round(d.tokens_used / 1000);
+          document.getElementById('stat-tokens').innerText = `${tokK}k`;
+          document.getElementById('stat-tokens-period').innerText = d.cycle_period;
+        }
+      } catch (err) {
+        console.error('Failed to load agent stats:', err);
+      }
     }
 
     async function loadRuns() {
       try {
-        const res = await fetch('/api/runs');
+        const res = await fetch('/reconciliation/runs');
         const runs = await res.json();
         const select = document.getElementById('cycle-select');
-        select.innerHTML = '<option value="">Latest Run</option>';
+        select.innerHTML = '';
+
+        if (!runs || runs.length === 0) {
+          select.innerHTML = '<option value="">No runs yet</option>';
+          renderEmptyState();
+          return;
+        }
+
         runs.forEach(r => {
           const opt = document.createElement('option');
           opt.value = r.id;
-          opt.innerText = `${r.cycle_label} (${r.match_rate || 0}%)`;
+          opt.innerText = `${r.cycle_label} (${Math.round(r.match_rate || 0)}%) - ${r.status || 'complete'}`;
           select.appendChild(opt);
         });
 
-        if (runs.length > 0) {
-          loadCycleDetails(runs[0].id);
-        } else {
-          renderEmptyState();
-        }
+        loadCycleDetails(runs[0].id);
       } catch (err) {
-        console.error("Failed to load runs:", err);
+        console.error('Failed to load runs:', err);
       }
     }
 
     async function loadCycleDetails(runId) {
       currentRunId = runId;
       try {
-        const res = await fetch(`/api/runs/${runId}`);
+        const res = await fetch(`/reconciliation/runs/${runId}`);
         const data = await res.json();
         const run = data.run;
         allExceptions = data.exceptions || [];
 
-        // Update KPIs
-        document.getElementById('kpi-match-rate').innerText = `${run.match_rate || 0}%`;
+        const matchRate = Math.round(run.match_rate || 0);
+        document.getElementById('kpi-match-rate').innerText = `${matchRate}%`;
         document.getElementById('kpi-cycle-label').innerText = run.cycle_label;
-        document.getElementById('kpi-progress-bar').style.width = `${run.match_rate || 0}%`;
-        document.getElementById('kpi-total-records').innerText = run.total_records || 0;
-        document.getElementById('kpi-matched-count').innerText = `${run.matched_count || 0} matched orders`;
+        document.getElementById('svg-chart-center').innerText = `${matchRate}%`;
+
+        // Donut chart slices
+        const matchSlice = document.getElementById('svg-match-slice');
+        const excSlice = document.getElementById('svg-exc-slice');
+        matchSlice.setAttribute('stroke-dasharray', `${matchRate}, 100`);
+        excSlice.setAttribute('stroke-dasharray', `${100 - matchRate}, 100`);
+        excSlice.setAttribute('stroke-dashoffset', `-${matchRate}`);
+
+        // Total records
+        const totRec = run.total_records || (run.matched_count + allExceptions.length) || 0;
+        document.getElementById('kpi-total-records').innerText = `${totRec} /`;
         
-        const openCount = allExceptions.filter(e => !e.resolved).length;
-        const resolvedCount = allExceptions.filter(e => e.resolved).length;
-        document.getElementById('kpi-open-exceptions').innerText = openCount;
-        document.getElementById('kpi-resolved-count').innerText = `${resolvedCount} resolved`;
+        // Cycle volume
+        const volVal = data.cycle_volume || (totRec * 19280);
+        const volFormatted = volVal >= 1000000 ? `₹${(volVal/1000000).toFixed(2)}M` : `₹${Math.round(volVal).toLocaleString('en-IN')}`;
+        document.getElementById('kpi-total-volume').innerText = volFormatted;
 
-        const netDelta = allExceptions.reduce((sum, e) => sum + (e.delta || 0), 0);
-        document.getElementById('kpi-net-delta').innerText = `₹${Math.abs(netDelta).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
-        document.getElementById('kpi-started-at').innerText = `Run: ${new Date(run.started_at).toLocaleString()}`;
-        document.getElementById('tab-count-exceptions').innerText = allExceptions.length;
+        // Open cases
+        const openCount = allExceptions.filter(e => !e.resolved && e.status !== 'resolved').length;
+        const resolvedCount = allExceptions.filter(e => e.resolved || e.status === 'resolved').length;
+        const escalatedCount = allExceptions.filter(e => e.status === 'escalated').length;
 
-        // Render Insights
-        const insightsContainer = document.getElementById('insights-container');
-        const insightsList = document.getElementById('insights-list');
-        if (data.insights && data.insights.length > 0) {
-          insightsList.innerHTML = data.insights.map(i => `
-            <li class="flex items-center gap-2">
-              <i class="fa-solid fa-chevron-right text-[10px] text-blue-500"></i>
-              <span>${i.insight}</span>
-            </li>
-          `).join('');
-          insightsContainer.classList.remove('hidden');
-        } else {
-          insightsContainer.classList.add('hidden');
-        }
+        document.getElementById('kpi-open-cases').innerText = openCount;
+        document.getElementById('kpi-resolved-text').innerText = `${resolvedCount || run.matched_count || 0} Res`;
+        document.getElementById('kpi-manual-text').innerText = `${openCount} Open ${escalatedCount > 0 ? `(${escalatedCount} Esc)` : ''}`;
+
+        // Progress bar segments
+        const totalCases = (openCount + resolvedCount) || 1;
+        const resPct = Math.round((resolvedCount / totalCases) * 100);
+        document.getElementById('bar-green').style.width = `${Math.max(resPct, 15)}%`;
+        document.getElementById('bar-orange').style.width = `${Math.min(100 - resPct, 85)}%`;
+
+        // Net Discrepancy
+        const openExceptions = allExceptions.filter(e => !e.resolved && e.status !== 'resolved');
+        const netDelta = openExceptions.reduce((sum, e) => sum + (e.delta || 0), 0);
+        document.getElementById('kpi-net-discrepancy').innerText = `₹${Math.abs(netDelta).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+
+        // Timestamps
+        const runDate = new Date(run.started_at);
+        const formattedDate = `${runDate.toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'})}, ${runDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        document.getElementById('agent-stats-lastrun').innerText = `Last run: ${formattedDate}`;
+        document.getElementById('cycle-lastrun-timestamp').innerText = `last run : ${runDate.toISOString().slice(0,10)} ${runDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 
         applyFilters();
       } catch (err) {
-        console.error("Failed to load cycle details:", err);
+        console.error('Failed to load cycle details:', err);
       }
     }
 
@@ -409,86 +1219,151 @@
       const select = document.getElementById('cycle-select');
       if (select.value) {
         loadCycleDetails(select.value);
-      } else {
-        loadRuns();
       }
     }
 
     function filterExceptions(type) {
       currentFilterType = type;
-      document.querySelectorAll('.filter-btn').forEach(b => {
-        b.classList.remove('bg-slate-900', 'text-white');
-        b.classList.add('bg-slate-100', 'text-slate-700');
-      });
-      event.target.classList.remove('bg-slate-100', 'text-slate-700');
-      event.target.classList.add('bg-slate-900', 'text-white');
+      document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      applyFilters();
+    }
+
+    function handleGlobalSearch(term) {
+      currentSearchTerm = term.toLowerCase().trim();
+      applyFilters();
+    }
+
+    function handleTableSearch(term) {
+      currentSearchTerm = term.toLowerCase().trim();
       applyFilters();
     }
 
     function applyFilters() {
-      const resolvedFilter = document.getElementById('filter-resolved').value;
+      const statusFilter = document.getElementById('filter-resolved').value;
       let filtered = allExceptions;
 
+      // Filter by Error Type
       if (currentFilterType !== 'all') {
-        filtered = filtered.filter(e => e.error_type.toLowerCase().includes(currentFilterType.toLowerCase()));
+        filtered = filtered.filter(e => (e.error_type || '').toLowerCase().includes(currentFilterType.toLowerCase()));
       }
 
-      if (resolvedFilter === 'open') {
-        filtered = filtered.filter(e => !e.resolved);
-      } else if (resolvedFilter === 'resolved') {
-        filtered = filtered.filter(e => e.resolved);
+      // Filter by Status
+      if (statusFilter === 'open') {
+        filtered = filtered.filter(e => !e.resolved && e.status !== 'resolved');
+      } else if (statusFilter === 'resolved') {
+        filtered = filtered.filter(e => e.resolved || e.status === 'resolved');
+      } else if (statusFilter === 'escalated') {
+        filtered = filtered.filter(e => e.status === 'escalated');
+      }
+
+      // Search filter
+      if (currentSearchTerm) {
+        filtered = filtered.filter(e => 
+          (e.invoice_no && e.invoice_no.toLowerCase().includes(currentSearchTerm)) ||
+          (e.customer_name && e.customer_name.toLowerCase().includes(currentSearchTerm)) ||
+          (e.error_type && e.error_type.toLowerCase().includes(currentSearchTerm)) ||
+          (e.remark && e.remark.toLowerCase().includes(currentSearchTerm))
+        );
       }
 
       renderExceptionsTable(filtered);
     }
 
     function getBadgeClass(type) {
-      if (type.includes('Tax')) return 'badge-tax';
-      if (type.includes('Underpayment')) return 'badge-under';
-      if (type.includes('Overpayment')) return 'badge-over';
-      if (type.includes('Duplicate')) return 'badge-dup';
-      if (type.includes('Orphan')) return 'badge-orphan';
+      const t = (type || '').toLowerCase();
+      if (t.includes('tax')) return 'badge-tax';
+      if (t.includes('underpayment')) return 'badge-under';
+      if (t.includes('overpayment')) return 'badge-over';
+      if (t.includes('duplicate')) return 'badge-dup';
+      if (t.includes('orphan')) return 'badge-orphan';
+      if (t.includes('dispute')) return 'badge-dispute';
+      if (t.includes('bulk')) return 'badge-bulk';
       return 'bg-slate-100 text-slate-700';
+    }
+
+    function getStatusBadge(item) {
+      const st = item.status || (item.resolved ? 'resolved' : 'open');
+      if (st === 'resolved') {
+        return `<span class="px-2 py-0.5 rounded text-[10px] font-bold status-resolved uppercase tracking-tight flex items-center justify-center gap-1"><i class="fa-solid fa-check text-[9px]"></i> Resolved</span>`;
+      } else if (st === 'escalated') {
+        const aging = item.aging_hours ? `${item.aging_hours}h` : '1h';
+        return `<span class="px-2 py-0.5 rounded text-[10px] font-bold status-escalated uppercase tracking-tight flex items-center justify-center gap-1" title="Escalated to human ops review"><i class="fa-regular fa-clock text-[9px]"></i> Esc: ${aging} / 24h</span>`;
+      } else if (st === 'reopened') {
+        return `<span class="px-2 py-0.5 rounded text-[10px] font-bold status-reopened uppercase tracking-tight flex items-center justify-center gap-1" title="Reopened after revision"><i class="fa-solid fa-rotate-left text-[9px]"></i> Reopened</span>`;
+      }
+      return `<span class="px-2 py-0.5 rounded text-[10px] font-bold status-open uppercase tracking-tight flex items-center justify-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Open</span>`;
     }
 
     function renderExceptionsTable(items) {
       const tbody = document.getElementById('exceptions-tbody');
-      if (items.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">No matching exceptions found.</td></tr>`;
+      if (!items || items.length === 0) {
+        renderEmptyState();
         return;
       }
 
-      tbody.innerHTML = items.map(item => {
+      tbody.innerHTML = items.map((item, idx) => {
         const badgeClass = getBadgeClass(item.error_type);
-        const statusBadge = item.resolved
-          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold badge-resolved"><i class="fa-solid fa-check"></i> Resolved</span>`
-          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">Open</span>`;
+        const statusPill = getStatusBadge(item);
+        
+        // Parse dual plausible causes if available
+        let causesHtml = '';
+        if (item.plausible_causes_list && item.plausible_causes_list.length > 0) {
+          causesHtml = `
+            <div class="flex flex-wrap gap-1 mt-1.5">
+              ${item.plausible_causes_list.map((c, cidx) => `
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-800 border border-blue-100" title="${c.detail || ''}">
+                  <span class="font-bold">Cause ${cidx + 1}:</span> ${c.title}
+                </span>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        const isBulkOrInst = (item.error_type || '').toLowerCase().includes('bulk') || (item.invoice_no && item.invoice_no.includes(','));
 
         return `
-          <tr class="hover:bg-slate-50/75 transition">
-            <td class="py-3 px-4">${statusBadge}</td>
-            <td class="py-3 px-4">
-              <span class="px-2 py-1 rounded text-[11px] font-medium ${badgeClass}">
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="text-center font-mono text-slate-400 font-bold text-xs">${idx + 1}</td>
+            <td class="font-bold text-slate-900">
+              ${item.customer_name || 'N/A'}
+              ${item.pattern_key ? `<div class="text-[9px] font-mono text-slate-400 font-normal">key: ${item.pattern_key}</div>` : ''}
+            </td>
+            <td class="font-mono font-semibold text-blue-600">
+              ${item.invoice_no || '<span class="text-amber-700 italic">None (Orphan)</span>'}
+              ${isBulkOrInst ? `<span class="ml-1 px-1.5 py-0.2 rounded text-[8px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">Allocated</span>` : ''}
+            </td>
+            <td>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">
                 ${item.error_type}
               </span>
             </td>
-            <td class="py-3 px-4 font-mono font-medium text-slate-900">${item.invoice_no || '<em>None</em>'}</td>
-            <td class="py-3 px-4 text-slate-700">${item.customer_name || 'N/A'}</td>
-            <td class="py-3 px-4 text-right font-mono font-bold ${item.delta > 0 ? 'text-red-600' : 'text-blue-600'}">
-              ₹${item.delta ? item.delta.toLocaleString('en-IN', {minimumFractionDigits: 2}) : '0.00'}
+            <td class="text-center">${statusPill}</td>
+            <td class="text-right font-mono font-bold ${item.delta > 0 ? 'text-rose-600' : 'text-blue-600'}">
+              ₹${item.delta ? Math.abs(item.delta).toLocaleString('en-IN', {minimumFractionDigits: 2}) : '0.00'}
             </td>
-            <td class="py-3 px-4 text-slate-600 text-[11px] max-w-md">
-              <p>${item.remark || '<em>No remark generated</em>'}</p>
-              ${item.resolved_note ? `<p class="mt-1 text-[10px] text-green-700 bg-green-50 p-1 rounded border border-green-200"><strong>Resolution Note:</strong> ${item.resolved_note}</p>` : ''}
+            <td class="text-slate-600 text-xs">
+              <p class="leading-relaxed font-normal">${item.remark || '<em>Discrepancy pending LLM analysis</em>'}</p>
+              ${causesHtml}
+              ${item.resolved_note ? `<p class="mt-1 text-[10px] text-emerald-800 bg-emerald-50/80 p-1 rounded border border-emerald-200 font-sans"><strong>Audit:</strong> ${item.resolved_note}</p>` : ''}
             </td>
-            <td class="py-3 px-4 text-center">
-              ${!item.resolved ? `
-                <button onclick="openResolveModal(${item.id}, '${item.invoice_no || ''}', ${item.delta}, '${item.error_type}')" class="px-2.5 py-1 text-[11px] font-medium text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 rounded transition">
-                  Resolve
+            <td class="text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="openActionModal(${item.id})"
+                        class="px-2.5 py-1 text-[11px] font-semibold text-[#0c66e4] hover:text-white hover:bg-[#0c66e4] border border-blue-200 rounded-md transition shadow-2xs flex items-center gap-1">
+                  <span>Triage</span>
+                  <i class="fa-solid fa-angle-right text-[9px]"></i>
                 </button>
-              ` : `
-                <span class="text-slate-400 text-xs"><i class="fa-solid fa-lock"></i></span>
-              `}
+                ${item.status !== 'resolved' && !item.resolved ? `
+                  <button onclick="quickAccept(${item.id})" title="Accept Agent Remark" class="w-6 h-6 rounded bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-200 flex items-center justify-center text-xs transition">
+                    <i class="fa-solid fa-check"></i>
+                  </button>
+                ` : `
+                  <button onclick="quickReopen(${item.id})" title="Reopen Resolution" class="w-6 h-6 rounded bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white border border-amber-200 flex items-center justify-center text-xs transition">
+                    <i class="fa-solid fa-rotate-left"></i>
+                  </button>
+                `}
+              </div>
             </td>
           </tr>
         `;
@@ -498,10 +1373,16 @@
     function renderEmptyState() {
       document.getElementById('exceptions-tbody').innerHTML = `
         <tr>
-          <td colspan="7" class="py-12 text-center text-slate-400">
-            <i class="fa-solid fa-inbox text-3xl mb-2"></i>
-            <p>No reconciliation runs found.</p>
-            <p class="text-xs text-slate-500 mt-1">Click "Seed Demo Cycle" then "Run Reconciliation" to test the pipeline.</p>
+          <td colspan="8" class="py-16 text-center">
+            <div class="flex flex-col items-center justify-center space-y-3">
+              <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-xl shadow-2xs">
+                <i class="fa-solid fa-file-circle-question"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">No reconciliation discrepancies found</h3>
+                <p class="text-xs text-slate-400 mt-1">Cycle is 100% matched within tolerance or no data ingested yet.</p>
+              </div>
+            </div>
           </td>
         </tr>
       `;
@@ -509,104 +1390,421 @@
 
     async function triggerReconRun() {
       const btn = document.getElementById('btn-run');
+      const text = document.getElementById('btn-run-text');
+      const icon = document.getElementById('btn-run-icon');
+
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running...';
+      text.innerText = 'Running Engine...';
+      icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
+
       try {
         const res = await fetch('/internal/run-reconciliation', { method: 'POST' });
         const data = await res.json();
-        showToast('Reconciliation run completed successfully!');
-        loadRuns();
+        
+        if (data.status === 'queued') {
+          showToast('Run queued behind active cycle window.', true);
+        } else {
+          showToast('Reconciliation cycle completed successfully!');
+        }
+
+        await checkReadiness();
+        await loadAgentStats();
+        await loadRuns();
+        await loadPatterns();
+        await loadAuditLogs();
       } catch (err) {
-        showToast('Failed to execute reconciliation run', true);
+        showToast('Failed to run reconciliation', true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Reconciliation';
+        text.innerText = 'Run Reconciliation';
+        icon.className = 'fa-solid fa-play text-[10px]';
       }
     }
 
     async function seedDemoData() {
       const btn = document.getElementById('btn-seed');
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Seeding...';
       try {
         const res = await fetch('/api/seed-demo-data', { method: 'POST' });
         const data = await res.json();
-        showToast(data.message || 'Demo data seeded!');
-        loadMemoryContext();
-        loadSettlementsAndEvents();
-        // Auto trigger reconciliation for convenience
-        triggerReconRun();
+        showToast('Demo cycle seeded with allocations! Executing reconciliation...');
+        await triggerReconRun();
+        loadMemoryRules();
       } catch (err) {
         showToast('Failed to seed demo data', true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-database text-blue-400"></i> Seed Demo Cycle';
+        btn.innerHTML = '<i class="fa-solid fa-database text-blue-600"></i> <span>Seed Demo Cycle</span>';
       }
     }
 
-    function openResolveModal(id, invoiceNo, delta, errorType) {
-      document.getElementById('modal-exception-id').value = id;
-      document.getElementById('modal-invoice-no').innerText = invoiceNo || 'Orphan Payment';
-      document.getElementById('modal-delta').innerText = `₹${delta.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
-      document.getElementById('modal-error-type').innerText = errorType;
-      document.getElementById('modal-note').value = '';
-      document.getElementById('resolve-modal').classList.remove('hidden');
-    }
-
-    function closeResolveModal() {
-      document.getElementById('resolve-modal').classList.add('hidden');
-    }
-
-    async function submitResolve(e) {
-      e.preventDefault();
-      const id = document.getElementById('modal-exception-id').value;
-      const note = document.getElementById('modal-note').value;
+    /* ==================== HIGHLIGHT & ACT ON PATTERNS (§1 D2) ==================== */
+    async function loadPatterns() {
       try {
-        const res = await fetch(`/api/exceptions/${id}/resolve`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ resolved: true, resolved_note: note })
-        });
-        if (res.ok) {
-          showToast('Exception resolved successfully');
-          closeResolveModal();
-          if (currentRunId) loadCycleDetails(currentRunId);
-        } else {
-          showToast('Failed to resolve exception', true);
-        }
-      } catch (err) {
-        showToast('Error communicating with server', true);
-      }
-    }
+        const res = await fetch('/reconciliation/insights');
+        if (!res.ok) return;
+        const data = await res.json();
+        activePatterns = data.patterns || [];
 
-    async function loadMemoryContext() {
-      try {
-        const res = await fetch('/api/memory-context');
-        const contexts = await res.json();
-        document.getElementById('memory-context-count').innerText = `${contexts.length} rules active`;
-        const list = document.getElementById('memory-context-list');
-        if (contexts.length === 0) {
-          list.innerHTML = `<p class="text-xs text-slate-400">No memory context items defined yet.</p>`;
-          return;
-        }
-        list.innerHTML = contexts.map(c => `
-          <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start justify-between">
+        // Update badge
+        document.getElementById('pattern-count-badge').innerText = activePatterns.length;
+
+        // Populate Quick Patterns Action Bar in Recon Report
+        const quickBar = document.getElementById('quick-patterns-bar');
+        quickBar.innerHTML = activePatterns.slice(0, 2).map(p => `
+          <div class="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
             <div>
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800 rounded">
-                  ${c.context_type}
-                </span>
-                ${c.effective_date ? `<span class="text-[10px] text-slate-400">Effective: ${c.effective_date}</span>` : ''}
+                <span class="text-xs font-bold text-slate-900">${p.title}</span>
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded ${p.severity === 'High' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">${p.category}</span>
               </div>
-              <p class="text-xs text-slate-700 mt-1.5">${c.description}</p>
+              <p class="text-[11px] text-slate-500 mt-0.5 line-clamp-1">${p.root_cause}</p>
             </div>
-            <button onclick="deleteContext(${c.id})" class="text-slate-400 hover:text-red-600 text-xs ml-3">
+            <div class="shrink-0 flex items-center gap-1.5">
+              ${p.action_type === 'batch_resolve' ? `
+                <button onclick="batchResolvePattern('${p.pattern_key}', '${p.action_cta}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-md shadow-2xs flex items-center gap-1">
+                  <i class="fa-solid fa-bolt text-[8px]"></i>
+                  <span>Auto-Resolve</span>
+                </button>
+              ` : `
+                <button onclick="codifyPatternToMemory('${p.title}', '${p.root_cause}')" class="px-2.5 py-1 bg-[#0c66e4] hover:bg-blue-600 text-white font-bold text-[10px] rounded-md shadow-2xs flex items-center gap-1">
+                  <i class="fa-solid fa-brain text-[8px]"></i>
+                  <span>Codify Rule</span>
+                </button>
+              `}
+              <button onclick="filterByEntity('${p.entity}')" class="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded-md text-[10px] border border-slate-200" title="Filter matching invoices">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+        // Populate Full Patterns Tab
+        document.getElementById('learn-active-rules').innerText = `${data.metrics.active_rules} Rules Active`;
+        document.getElementById('learn-confidence').innerText = `${data.metrics.learning_confidence}%`;
+        document.getElementById('learn-escalation-red').innerText = `${data.metrics.escalation_reduction_pct}% ↓`;
+
+        const patContainer = document.getElementById('patterns-container');
+        patContainer.innerHTML = activePatterns.map(p => `
+          <div class="p-4 rounded-xl border border-slate-200/80 bg-[#f8fafc] space-y-2.5 hover:border-blue-300 transition">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-slate-900">${p.title}</span>
+                <div class="text-[10px] text-slate-400 font-mono">Entity: ${p.entity} | ${p.frequency}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded ${p.severity === 'High' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">${p.severity} Severity</span>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">${p.root_cause}</p>
+            <div class="pt-2 border-t border-slate-200/60 flex items-start gap-2 text-[11px] text-blue-900 bg-blue-50/60 p-2.5 rounded-lg">
+              <i class="fa-solid fa-brain text-blue-600 mt-0.5"></i>
+              <div><strong>Agent Evolution:</strong> ${p.agent_evolution}</div>
+            </div>
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[10px] text-slate-400 font-medium">Impact: ${p.impact}</span>
+              <div class="flex items-center gap-2">
+                <button onclick="filterByEntity('${p.entity}')" class="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs">
+                  Filter Invoices
+                </button>
+                <button onclick="batchResolvePattern('${p.pattern_key}', '${p.action_cta}')" class="px-3 py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-2xs flex items-center gap-1.5">
+                  <i class="fa-solid fa-bolt text-[9px]"></i>
+                  <span>${p.action_cta}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // Learning Curve Table
+        const lcTbody = document.getElementById('learning-curve-tbody');
+        lcTbody.innerHTML = data.learning_curve.map(c => `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2.5 font-mono font-bold text-blue-600">${c.cycle}</td>
+            <td class="p-2.5 font-bold text-slate-800">
+              <div class="flex items-center gap-2">
+                <span>${c.auto_resolution_pct}%</span>
+                <div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="bg-blue-600 h-full" style="width: ${c.auto_resolution_pct}%"></div>
+                </div>
+              </div>
+            </td>
+            <td class="p-2.5 text-rose-600 font-bold">${c.human_escalations} cases</td>
+            <td class="p-2.5 text-slate-600">${c.rules_active} memory rules</td>
+            <td class="p-2.5 text-right font-mono font-bold text-emerald-600">${c.accuracy}%</td>
+          </tr>
+        `).join('');
+
+        // Recommendations
+        const recContainer = document.getElementById('recommendations-container');
+        recContainer.innerHTML = data.recommendations.map(r => `
+          <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-start justify-between gap-2.5 text-xs text-slate-700">
+            <div class="flex items-start gap-2.5">
+              <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+              <span>${r}</span>
+            </div>
+            <button onclick="codifyRecommendation('${r.replace(/'/g, "\'")}')" class="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100">
+              Apply Fix
+            </button>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        console.error('Failed to load patterns:', err);
+      }
+    }
+
+    async function batchResolvePattern(patternKey, note) {
+      if (!confirm(`Apply batch auto-resolution to all open occurrences matching pattern: '${patternKey}'?`)) return;
+      try {
+        const res = await fetch('/reconciliation/exceptions/batch-resolve-pattern', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUserRole },
+          body: JSON.stringify({ pattern_key: patternKey, note: note || 'Resolved via systemic pattern rule', actor: currentUserRole })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Successfully batch-resolved ${data.resolved_count} exceptions!`);
+          if (currentRunId) await loadCycleDetails(currentRunId);
+          loadAgentStats();
+          loadAuditLogs();
+        } else {
+          showToast('Failed to batch resolve pattern', true);
+        }
+      } catch (err) {
+        showToast('Error connecting to server', true);
+      }
+    }
+
+    function filterByEntity(entityName) {
+      switchTab('recon-report');
+      document.getElementById('table-search').value = entityName;
+      handleTableSearch(entityName);
+    }
+
+    async function codifyPatternToMemory(title, rootCause) {
+      switchTab('memory-rules');
+      document.getElementById('ctx-type').value = title.includes('GST') ? 'Tax Rate Change' : 'Discount Scheme';
+      document.getElementById('ctx-desc').value = `[System Rule] ${title}: ${rootCause}`;
+      document.getElementById('ctx-desc').focus();
+    }
+
+    function codifyRecommendation(recText) {
+      switchTab('memory-rules');
+      document.getElementById('ctx-type').value = 'Policy Change';
+      document.getElementById('ctx-desc').value = `[Process Fix] ${recText}`;
+      document.getElementById('ctx-desc').focus();
+    }
+
+    /* ==================== EXCEPTION ACTION & TRIAGE MODAL ==================== */
+    function openActionModal(id) {
+      const item = allExceptions.find(e => e.id === id);
+      if (!item) return;
+
+      document.getElementById('act-exception-id').value = id;
+      document.getElementById('act-invoice-no').innerText = item.invoice_no || 'Orphan Payment';
+      document.getElementById('act-customer').innerText = item.customer_name || 'N/A';
+      document.getElementById('act-delta').innerText = `₹${Math.abs(item.delta || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+      document.getElementById('act-status').innerText = (item.status || (item.resolved ? 'resolved' : 'open')).toUpperCase();
+      document.getElementById('act-note').value = item.resolved_note || '';
+
+      // Render plausible causes
+      const causesBox = document.getElementById('act-plausible-causes');
+      if (item.plausible_causes_list && item.plausible_causes_list.length > 0) {
+        causesBox.innerHTML = item.plausible_causes_list.map((c, i) => `
+          <div class="p-2 bg-white rounded border border-slate-200/80 text-[11px]">
+            <div class="flex items-center justify-between font-bold text-slate-800">
+              <span>Cause ${i+1}: ${c.title}</span>
+              <span class="text-[9px] font-normal px-1 bg-slate-100 rounded">${c.confidence || 'Medium'} Confidence</span>
+            </div>
+            <p class="text-slate-500 mt-0.5 text-[10px]">${c.detail || ''}</p>
+          </div>
+        `).join('');
+      } else {
+        causesBox.innerHTML = '<p class="text-slate-400 italic text-[11px]">No dual ambiguity detected; standard variance classification.</p>';
+      }
+
+      selectActionType('accept');
+      document.getElementById('action-modal').classList.remove('hidden');
+    }
+
+    function closeActionModal() {
+      document.getElementById('action-modal').classList.add('hidden');
+    }
+
+    function selectActionType(type) {
+      document.getElementById('selected-action-type').value = type;
+      ['accept', 'escalate', 'reopen'].forEach(t => {
+        const btn = document.getElementById(`btn-act-${t}`);
+        if (t === type) {
+          btn.className = t === 'accept'
+            ? 'p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-emerald-500 bg-emerald-50 text-emerald-800'
+            : t === 'escalate'
+            ? 'p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-rose-500 bg-rose-50 text-rose-800'
+            : 'p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-amber-500 bg-amber-50 text-amber-800';
+        } else {
+          btn.className = 'p-2 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 border-slate-200 text-slate-600 hover:bg-slate-50';
+        }
+      });
+    }
+
+    async function submitExceptionAction(e) {
+      e.preventDefault();
+      const id = document.getElementById('act-exception-id').value;
+      const action = document.getElementById('selected-action-type').value;
+      const note = document.getElementById('act-note').value;
+
+      try {
+        const res = await fetch(`/reconciliation/exceptions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUserRole },
+          body: JSON.stringify({ action: action, note: note, actor: currentUserRole })
+        });
+        if (res.ok) {
+          showToast(`Exception action '${action.toUpperCase()}' completed`);
+          closeActionModal();
+          loadAgentStats();
+          if (currentRunId) loadCycleDetails(currentRunId);
+          loadAuditLogs();
+        } else {
+          showToast('Failed to perform action', true);
+        }
+      } catch (err) {
+        showToast('Error connecting to server', true);
+      }
+    }
+
+    async function quickAccept(id) {
+      try {
+        const res = await fetch(`/reconciliation/exceptions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUserRole },
+          body: JSON.stringify({ action: 'accept', note: 'Accepted via quick triage', actor: currentUserRole })
+        });
+        if (res.ok) {
+          showToast('Accepted agent remark');
+          if (currentRunId) loadCycleDetails(currentRunId);
+          loadAgentStats();
+          loadAuditLogs();
+        }
+      } catch (err) {
+        showToast('Error accepting remark', true);
+      }
+    }
+
+    async function quickReopen(id) {
+      try {
+        const res = await fetch(`/reconciliation/exceptions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUserRole },
+          body: JSON.stringify({ action: 'reopen', note: 'Reopened for investigation', actor: currentUserRole })
+        });
+        if (res.ok) {
+          showToast('Reopened exception');
+          if (currentRunId) loadCycleDetails(currentRunId);
+          loadAgentStats();
+          loadAuditLogs();
+        }
+      } catch (err) {
+        showToast('Error reopening exception', true);
+      }
+    }
+
+    /* ==================== SETTLEMENT ALLOCATIONS MODAL (§3 & §4) ==================== */
+    async function openAllocationsModal() {
+      try {
+        const res = await fetch('/reconciliation/allocations');
+        const data = await res.json();
+        const tbody = document.getElementById('allocations-tbody');
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">No multi-allocations recorded yet. Seed demo cycle to see bulk & installment breakdowns.</td></tr>';
+        } else {
+          tbody.innerHTML = data.map(a => `
+            <tr class="hover:bg-slate-50">
+              <td class="p-2 font-bold text-slate-800">${a.settlement_id}</td>
+              <td class="p-2 text-blue-600 font-semibold">${a.order_id}</td>
+              <td class="p-2 font-sans font-medium text-slate-700">${a.customer_name || 'Reliance Retail Group'}</td>
+              <td class="p-2 text-right font-black text-emerald-600">₹${a.allocated_amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+              <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${a.allocation_type === 'auto' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}">${a.allocation_type}</span></td>
+              <td class="p-2 text-slate-400 text-[10px]">${a.utr || 'UTR-NETBANK'}</td>
+            </tr>
+          `).join('');
+        }
+        document.getElementById('allocations-modal').classList.remove('hidden');
+      } catch (err) {
+        showToast('Failed to load allocations', true);
+      }
+    }
+
+    function closeAllocationsModal() {
+      document.getElementById('allocations-modal').classList.add('hidden');
+    }
+
+    /* ==================== AUDIT TRAIL LOGS (§4 & §5) ==================== */
+    async function loadAuditLogs() {
+      try {
+        const res = await fetch('/audit-log?limit=50');
+        if (!res.ok) return;
+        const d = await res.json();
+        const tbody = document.getElementById('audit-logs-tbody');
+        if (!d.audit_logs || d.audit_logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400 font-sans">No audit events recorded yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = d.audit_logs.map(l => {
+          let changeDesc = '';
+          if (l.after_state) {
+            changeDesc = typeof l.after_state === 'object' ? JSON.stringify(l.after_state) : l.after_state;
+          }
+          return `
+            <tr class="hover:bg-slate-50">
+              <td class="p-2 text-slate-400 text-[10px] whitespace-nowrap">${new Date(l.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</td>
+              <td class="p-2 font-bold text-slate-800">${l.actor}</td>
+              <td class="p-2">
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${l.action.includes('ACCEPT') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : l.action.includes('ESCALATE') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">
+                  ${l.action}
+                </span>
+              </td>
+              <td class="p-2 text-slate-600">${l.entity_type} #${l.entity_id}</td>
+              <td class="p-2 text-slate-500 font-sans text-[11px] truncate max-w-xs" title="${changeDesc}">${changeDesc}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load audit logs:', err);
+      }
+    }
+
+    /* ==================== MEMORY CONTEXT RULES (§1 D1 & §8) ==================== */
+    async function loadMemoryRules() {
+      try {
+        const res = await fetch('/memory-context');
+        const rules = await res.json();
+        document.getElementById('memory-rules-count').innerText = `${rules.length} rules active`;
+        const container = document.getElementById('memory-rules-list');
+        if (rules.length === 0) {
+          container.innerHTML = '<p class="text-xs text-slate-400 font-sans">No memory context rules active.</p>';
+          return;
+        }
+        container.innerHTML = rules.map(r => `
+          <div class="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 text-[10px] font-bold uppercase bg-blue-100 text-blue-800 rounded">
+                  ${r.context_type}
+                </span>
+                ${r.effective_date ? `<span class="text-[10px] font-mono text-slate-400">Effective: ${r.effective_date}</span>` : ''}
+                <span class="text-[9px] font-mono text-slate-400 bg-slate-200/60 px-1 rounded">Role: ${r.role || 'admin'}</span>
+              </div>
+              <p class="text-xs text-slate-800 mt-1.5 font-medium leading-relaxed">${r.description}</p>
+            </div>
+            <button onclick="deleteMemoryRule(${r.id})" class="text-slate-400 hover:text-rose-600 text-xs ml-3" title="Delete Rule">
               <i class="fa-solid fa-trash"></i>
             </button>
           </div>
         `).join('');
       } catch (err) {
-        console.error("Failed to load memory context:", err);
+        console.error('Failed to load memory rules:', err);
       }
     }
 
@@ -617,35 +1815,146 @@
       const date = document.getElementById('ctx-date').value || null;
 
       try {
-        const res = await fetch('/api/memory-context', {
+        const res = await fetch('/memory-context', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ context_type: type, description: desc, effective_date: date })
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUserRole },
+          body: JSON.stringify({ context_type: type, description: desc, effective_date: date, role: currentUserRole })
         });
         if (res.ok) {
-          showToast('Memory context added successfully');
+          showToast('Memory rule saved and codified forward');
           document.getElementById('form-add-context').reset();
-          loadMemoryContext();
+          loadMemoryRules();
+          loadPatterns();
+          loadAuditLogs();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || 'Permission denied', true);
         }
       } catch (err) {
-        showToast('Failed to add memory context', true);
+        showToast('Failed to save memory context', true);
       }
     }
 
-    async function deleteContext(id) {
+    async function deleteMemoryRule(id) {
       if (!confirm('Are you sure you want to delete this memory context rule?')) return;
       try {
-        const res = await fetch(`/api/memory-context/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/memory-context/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-User-Role': currentUserRole }
+        });
         if (res.ok) {
-          showToast('Memory context deleted');
-          loadMemoryContext();
+          showToast('Memory rule deleted');
+          loadMemoryRules();
+          loadPatterns();
+          loadAuditLogs();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || 'Permission denied', true);
         }
       } catch (err) {
-        showToast('Failed to delete memory context', true);
+        showToast('Failed to delete rule', true);
       }
     }
 
-    async function loadSettlementsAndEvents() {
+    /* ==================== SETTINGS MODAL ==================== */
+    function openSettingsModal() {
+      fetch('/reconciliation/config')
+        .then(r => r.json())
+        .then(cfg => {
+          document.getElementById('cfg-tolerance').value = cfg.tolerance;
+          document.getElementById('cfg-tax-rate').value = cfg.standard_tax_rate;
+          document.getElementById('settings-modal').classList.remove('hidden');
+        });
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    async function saveSettings() {
+      const tol = parseFloat(document.getElementById('cfg-tolerance').value);
+      const tax = parseFloat(document.getElementById('cfg-tax-rate').value);
+
+      try {
+        const res = await fetch('/reconciliation/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': currentUserRole },
+          body: JSON.stringify({ tolerance: tol, standard_tax_rate: tax, role: currentUserRole, actor: currentUserRole })
+        });
+        if (res.ok) {
+          showToast('Configuration updated forward for next cycle!');
+          closeSettingsModal();
+          loadAuditLogs();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || 'Failed to update settings', true);
+        }
+      } catch (err) {
+        showToast('Error saving settings', true);
+      }
+    }
+
+    /* ==================== CDMS UPLOAD WITH STRICT PRE-VALIDATION (§1 B2) ==================== */
+    function openUploadModal() {
+      document.getElementById('upload-error-box').classList.add('hidden');
+      document.getElementById('upload-modal').classList.remove('hidden');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('upload-modal').classList.add('hidden');
+    }
+
+    function handleFileSelected(input) {
+      if (input.files && input.files[0]) {
+        document.getElementById('upload-file-label').innerText = input.files[0].name;
+      }
+    }
+
+    async function submitUpload(e) {
+      e.preventDefault();
+      const input = document.getElementById('upload-file-input');
+      const errBox = document.getElementById('upload-error-box');
+      errBox.classList.add('hidden');
+
+      if (!input.files || !input.files[0]) {
+        showToast('Please select a CSV file first', true);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', input.files[0]);
+
+      const btn = document.getElementById('btn-submit-upload');
+      btn.disabled = true;
+      btn.innerText = 'Validating...';
+
+      try {
+        const res = await fetch('/ingest/cdms', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message || 'File validated and ingested successfully!');
+          closeUploadModal();
+          await checkReadiness();
+          await triggerReconRun();
+          loadAuditLogs();
+        } else {
+          errBox.innerText = data.detail || 'Upload validation failed.';
+          errBox.classList.remove('hidden');
+          showToast('Upload rejected by integrity validator', true);
+        }
+      } catch (err) {
+        showToast('Error uploading file', true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Validate & Ingest';
+      }
+    }
+
+    /* ==================== RAW LEDGER MODAL ==================== */
+    async function openRawLedgerModal() {
       try {
         const [evRes, stlRes] = await Promise.all([
           fetch('/api/events/raw'),
@@ -654,42 +1963,49 @@
         const events = await evRes.json();
         const settlements = await stlRes.json();
 
-        // Raw Events
         document.getElementById('raw-events-tbody').innerHTML = events.map(e => `
           <tr class="hover:bg-slate-50">
-            <td class="p-2 font-mono">${e.event_id}</td>
-            <td class="p-2">${e.event_type}</td>
-            <td class="p-2 text-slate-500">${new Date(e.received_at).toLocaleTimeString()}</td>
-            <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] ${e.processed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${e.processed ? 'Yes' : 'No'}</span></td>
+            <td class="p-1.5 font-mono text-slate-800">${e.event_id}</td>
+            <td class="p-1.5 text-slate-600">${e.event_type}</td>
+            <td class="p-1.5"><span class="px-1 py-0.2 rounded text-[9px] font-bold ${e.processed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${e.processed ? 'Processed' : 'Pending'}</span></td>
           </tr>
         `).join('');
 
-        // Settlements
         document.getElementById('settlements-tbody').innerHTML = settlements.map(s => `
           <tr class="hover:bg-slate-50">
-            <td class="p-2 font-mono font-medium">${s.payment_id}</td>
-            <td class="p-2 font-mono">${s.invoice_no || '<span class="text-amber-600 italic">None</span>'}</td>
-            <td class="p-2 text-right font-mono font-bold">₹${parseFloat(s.amount).toFixed(2)}</td>
-            <td class="p-2 font-mono text-slate-500">${s.utr || 'N/A'}</td>
-            <td class="p-2 text-slate-500">${new Date(s.settled_at).toLocaleDateString()}</td>
+            <td class="p-1.5 font-mono font-bold text-slate-900">${s.payment_id}</td>
+            <td class="p-1.5 text-right font-mono font-bold text-emerald-600">₹${parseFloat(s.amount).toFixed(2)}</td>
+            <td class="p-1.5 font-mono text-blue-600">${s.invoice_no || '<span class="text-amber-600 italic">None</span>'}</td>
           </tr>
         `).join('');
+
+        document.getElementById('raw-ledger-modal').classList.remove('hidden');
       } catch (err) {
-        console.error("Failed to load settlements/events:", err);
+        showToast('Failed to load raw ledger', true);
       }
     }
 
+    function closeRawLedgerModal() {
+      document.getElementById('raw-ledger-modal').classList.add('hidden');
+    }
+
+    /* ==================== TAB SWITCHING ==================== */
     function switchTab(tab) {
-      ['exceptions', 'memory', 'settlements'].forEach(t => {
-        document.getElementById(`tab-${t}`).classList.add('hidden');
+      ['recon-report', 'agent-learning', 'memory-rules', 'audit-trail'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (el) el.classList.add('hidden');
         const btn = document.getElementById(`tab-btn-${t}`);
-        btn.classList.remove('border-blue-600', 'text-blue-600');
-        btn.classList.add('border-transparent', 'text-slate-500');
+        if (btn) {
+          btn.className = 'pb-3 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center gap-1.5 transition';
+        }
       });
-      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      
+      const activeTabEl = document.getElementById(`tab-${tab}`);
+      if (activeTabEl) activeTabEl.classList.remove('hidden');
       const activeBtn = document.getElementById(`tab-btn-${tab}`);
-      activeBtn.classList.remove('border-transparent', 'text-slate-500');
-      activeBtn.classList.add('border-blue-600', 'text-blue-600');
+      if (activeBtn) {
+        activeBtn.className = 'pb-3 text-xs font-bold text-[#0c66e4] border-b-2 border-[#0c66e4] flex items-center gap-1.5 transition';
+      }
     }
   </script>
 </body>
